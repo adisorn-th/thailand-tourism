@@ -64,16 +64,42 @@ const REGION_CONFIG: RegionConfig = {
   "South": { name: "ภาคใต้", color: "#2563EB", textColor: "#FFFFFF", description: "ด้ามขวานทอง ขนาบด้วยสองฝั่งทะเล", provinces: ["กระบี่", "ชุมพร", "ตรัง", "นครศรีธรรมราช", "นราธิวาส", "ปัตตานี", "พังงา", "พัทลุง", "ภูเก็ต", "ยะลา", "ระนอง", "สงขลา", "สตูล", "สุราษฎร์ธานี"] }
 };
 
-const getRegionByProvince = (provinceName: string): string => {
-  const cleanName = provinceName.trim().replace(/^(จ\.|จังหวัด|จ )/, '');
-  for (const [regionKey, data] of Object.entries(REGION_CONFIG)) {
-    const match = data.provinces.some(p => {
-        const cleanP = p.trim();
-        return cleanName === cleanP || cleanName.includes(cleanP) || cleanP.includes(cleanName);
+const REGION_PROVINCES_EN: Record<string, string[]> = {
+  "North": ["Chiang Rai", "Chiang Mai", "Nan", "Phayao", "Phrae", "Mae Hong Son", "Lampang", "Lamphun", "Uttaradit"],
+  "Northeast": ["Kalasin", "Khon Kaen", "Chaiyaphum", "Nakhon Phanom", "Nakhon Ratchasima", "Bueng Kan", "Buri Ram", "Maha Sarakham", "Mukdahan", "Yasothon", "Roi Et", "Loei", "Sakon Nakhon", "Surin", "Si Sa Ket", "Nong Khai", "Nong Bua Lam Phu", "Udon Thani", "Ubon Ratchathani", "Amnat Charoen"],
+  "Central": ["Bangkok Metropolis", "Bangkok", "Kamphaeng Phet", "Chai Nat", "Nakhon Nayok", "Nakhon Pathom", "Nakhon Sawan", "Nonthaburi", "Pathum Thani", "Phra Nakhon Si Ayutthaya", "Phichit", "Phitsanulok", "Phetchabun", "Lop Buri", "Samut Prakan", "Samut Songkhram", "Samut Sakhon", "Saraburi", "Sing Buri", "Sukhothai", "Suphan Buri", "Ang Thong", "Uthai Thani"],
+  "East": ["Chanthaburi", "Chachoengsao", "Chon Buri", "Trat", "Prachin Buri", "Rayong", "Sa Kaeo"],
+  "West": ["Kanchanaburi", "Tak", "Prachuap Khiri Khan", "Phetchaburi", "Ratchaburi"],
+  "South": ["Krabi", "Chumphon", "Trang", "Nakhon Si Thammarat", "Narathiwat", "Pattani", "Phangnga", "Phatthalung", "Phuket", "Yala", "Ranong", "Songkhla", "Satun", "Surat Thani"]
+};
+
+const normalizeProvinceName = (name: string): string => {
+  if (!name) return "";
+  return name
+    .toLowerCase()
+    .replace(/^(จ\.|จังหวัด|จ )/, "")
+    .replace(/province$/i, "")
+    .replace(/[().,]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+};
+
+const REGION_LOOKUP: Record<string, string> = (() => {
+  const lookup: Record<string, string> = {};
+  const add = (regionKey: string, names: string[]) => {
+    names.forEach((name) => {
+      const normalized = normalizeProvinceName(name);
+      if (normalized) lookup[normalized] = regionKey;
     });
-    if (match) return regionKey;
-  }
-  return "Central";
+  };
+  Object.entries(REGION_CONFIG).forEach(([key, config]) => add(key, config.provinces));
+  Object.entries(REGION_PROVINCES_EN).forEach(([key, names]) => add(key, names));
+  return lookup;
+})();
+
+const getRegionByProvince = (provinceName: string): string => {
+  const normalized = normalizeProvinceName(provinceName);
+  return REGION_LOOKUP[normalized] || "Central";
 };
 
 // URLs
