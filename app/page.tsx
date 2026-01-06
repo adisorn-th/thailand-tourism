@@ -244,6 +244,8 @@ export default function App() {
 
     const pathGenerator = d3.geoPath().projection(projection);
     const g = svg.append("g");
+    const gPaths = g.append("g").attr("class", "map-paths");
+    const gLabels = g.append("g").attr("class", "map-labels");
 
     // Setup Zoom Behavior
     const zoom = d3.zoom()
@@ -256,7 +258,7 @@ export default function App() {
     zoomRef.current = zoom;
 
     if (featuresToRender.length > 0) {
-        g.selectAll("path")
+        gPaths.selectAll("path")
         .data(featuresToRender)
         .enter()
         .append("path")
@@ -312,14 +314,14 @@ export default function App() {
                 });
                 
                 // Reset all paths first
-                g.selectAll("path").attr("fill", (feat: GeoJSONFeature, idx: number) => getFillColor(feat, idx)); 
+                gPaths.selectAll("path").attr("fill", (feat: GeoJSONFeature, idx: number) => getFillColor(feat, idx)); 
                 // Highlight clicked
                 d3.select(this).attr("fill", "#DC2626").raise();
             }
         });
 
         if (showLabels) {
-            g.selectAll("text")
+            gLabels.selectAll("text")
             .data(featuresToRender)
             .enter()
             .append("text")
