@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { MapPin, Info, Compass, X, Type, ChevronLeft, AlertCircle, Plus, Minus, Search, Sparkles, Play, Pause, Share2, Layers } from 'lucide-react';
+import { MapPin, Info, Compass, X, Type, ChevronLeft, AlertCircle, Plus, Minus, Search, Sparkles, Play, Pause, Share2, Layers, Languages } from 'lucide-react';
 
 // --- TYPE DEFINITIONS ---
 declare global {
@@ -104,9 +104,26 @@ interface SearchResult {
   tambonName?: string;
 }
 
-interface SearchIndexItem extends SearchResult {
+interface SearchIndexItem {
+  id: string;
+  type: 'province' | 'amphoe' | 'tambon';
+  labelTh: string;
+  labelEn: string;
+  sublabelTh?: string;
+  sublabelEn?: string;
+  provinceName: string;
+  amphoeName?: string;
+  tambonName?: string;
   searchKey: string;
 }
+
+interface TambonListItem {
+  nameTh: string;
+  nameEn: string;
+  postalCodes: string[];
+}
+
+type Language = 'TH' | 'EN';
 
 // --- CONFIGURATION ---
 const REGION_CONFIG: RegionConfig = {
@@ -127,12 +144,143 @@ const REGION_PROVINCES_EN: Record<string, string[]> = {
   "South": ["Krabi", "Chumphon", "Trang", "Nakhon Si Thammarat", "Narathiwat", "Pattani", "Phangnga", "Phatthalung", "Phuket", "Yala", "Ranong", "Songkhla", "Satun", "Surat Thani"]
 };
 
+const REGION_LABELS_EN: Record<string, string> = {
+  North: "Northern",
+  Northeast: "Northeastern",
+  Central: "Central",
+  East: "Eastern",
+  West: "Western",
+  South: "Southern"
+};
+
+const UI_TEXT = {
+  TH: {
+    mapTitle: "แผนที่ประเทศไทย",
+    mapSubtitle: "คลิกที่จังหวัดเพื่อดูรายอำเภอ",
+    backToAmphoe: "กลับไปเลือกอำเภอ",
+    backToCountry: "กลับไปหน้าประเทศไทย",
+    loadingCountry: "กำลังโหลดแผนที่ประเทศไทย...",
+    loadingAmphoe: "กำลังโหลดข้อมูลอำเภอ...",
+    loadingTambon: "กำลังโหลดข้อมูลตำบล...",
+    loadingFallback: "กำลังโหลด...",
+    errorTitle: "เกิดข้อผิดพลาด",
+    errorBackHome: "กลับไปหน้าหลัก",
+    toggleLabelsHide: "ซ่อนชื่อ",
+    toggleLabelsShow: "แสดงชื่อ",
+    focusMode: "โหมดโฟกัส",
+    shareLink: "แชร์ลิงก์",
+    linkCopied: "คัดลอกแล้ว",
+    layerRegion: "ภูมิภาค",
+    layerArea: "ขนาดพื้นที่",
+    searchPlaceholder: "ค้นหาจังหวัด/อำเภอ/ตำบล",
+    searchLoading: "กำลังโหลดฐานข้อมูลค้นหา...",
+    searchNoResults: "ไม่พบผลลัพธ์",
+    typeProvince: "จังหวัด",
+    typeAmphoe: "อำเภอ",
+    typeTambon: "ตำบล",
+    legendTitle: "ภูมิภาค",
+    legendSmall: "เล็ก",
+    legendLarge: "ใหญ่",
+    tourStart: "เริ่มทัวร์ภาค",
+    tourStop: "หยุดทัวร์ภาค",
+    touringPrefix: "กำลังพาเที่ยว",
+    sidebarTitleProvince: "ข้อมูลจังหวัด",
+    sidebarTitleAmphoe: "ข้อมูลอำเภอ",
+    sidebarTitleTambon: "ข้อมูลตำบล",
+    emptyCountryTitle: "เลือกจังหวัดเพื่อดูข้อมูลลึก",
+    emptyCountryHint: "คลิกที่จังหวัดใดก็ได้ เช่น \"เชียงราย\" ระบบจะแสดงแผนที่รายอำเภอ",
+    breadcrumbCountry: "ประเทศไทย",
+    selectedAmphoeTitle: "อำเภอที่เลือก",
+    postalCode: "รหัสไปรษณีย์",
+    area: "พื้นที่ (km²)",
+    areaUnknown: "ไม่มีข้อมูลพื้นที่",
+    noAmphoeTitle: "ยังไม่ได้เลือกอำเภอ",
+    noAmphoeHint: "คลิกที่อำเภอในแผนที่เพื่อดูตำบล",
+    selectedTambonTitle: "ตำบลที่เลือก",
+    allPostcodes: "รหัสไปรษณีย์ทั้งหมด",
+    postcodesLoading: "กำลังโหลดรหัสไปรษณีย์...",
+    postcodesNotFound: "ไม่พบรหัสไปรษณีย์",
+    noTambonTitle: "ยังไม่ได้เลือกตำบล",
+    noTambonHint: "คลิกที่พื้นที่ในแผนที่เพื่อดูข้อมูลตำบล",
+    noTambonHintList: "เลือกตำบลจากรายชื่อด้านล่างเพื่อดูข้อมูล",
+    backToOtherProvinces: "กลับไปเลือกจังหวัดอื่น",
+    errorAmphoe: "ไม่สามารถโหลดข้อมูลอำเภอได้ (กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ต)",
+    errorTambon: "ไม่สามารถโหลดข้อมูลตำบลได้ (กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ต)",
+    errorPostcodes: "ไม่สามารถโหลดรหัสไปรษณีย์ได้",
+    tambonMapUnavailableTitle: "ไม่มีแผนที่ตำบลในชุดข้อมูลแผนที่",
+    tambonMapUnavailableHint: "แสดงรายชื่อแขวง/ตำบลจากฐานไปรษณีย์ทางแถบข้อมูลแทน",
+    tambonFallbackListTitle: "รายชื่อแขวง/ตำบลจากฐานไปรษณีย์",
+    tambonFallbackListHint: "คลิกชื่อเพื่อดูรหัสไปรษณีย์ทั้งหมด",
+    tambonFallbackEmpty: "ไม่พบรายชื่อแขวง/ตำบลในฐานไปรษณีย์"
+  },
+  EN: {
+    mapTitle: "Thailand Map",
+    mapSubtitle: "Click a province to view districts",
+    backToAmphoe: "Back to districts",
+    backToCountry: "Back to Thailand map",
+    loadingCountry: "Loading Thailand map...",
+    loadingAmphoe: "Loading district data...",
+    loadingTambon: "Loading subdistrict data...",
+    loadingFallback: "Loading...",
+    errorTitle: "Something went wrong",
+    errorBackHome: "Back to home",
+    toggleLabelsHide: "Hide labels",
+    toggleLabelsShow: "Show labels",
+    focusMode: "Focus mode",
+    shareLink: "Share link",
+    linkCopied: "Copied",
+    layerRegion: "Region",
+    layerArea: "Area size",
+    searchPlaceholder: "Search province/district/subdistrict",
+    searchLoading: "Loading search index...",
+    searchNoResults: "No results found",
+    typeProvince: "Province",
+    typeAmphoe: "District",
+    typeTambon: "Subdistrict",
+    legendTitle: "Regions",
+    legendSmall: "Small",
+    legendLarge: "Large",
+    tourStart: "Start region tour",
+    tourStop: "Stop region tour",
+    touringPrefix: "Touring",
+    sidebarTitleProvince: "Province info",
+    sidebarTitleAmphoe: "District info",
+    sidebarTitleTambon: "Subdistrict info",
+    emptyCountryTitle: "Select a province for details",
+    emptyCountryHint: "Click a province (e.g., Chiang Rai) to see districts",
+    breadcrumbCountry: "Thailand",
+    selectedAmphoeTitle: "Selected district",
+    postalCode: "Postal code",
+    area: "Area (km²)",
+    areaUnknown: "Area data unavailable",
+    noAmphoeTitle: "No district selected",
+    noAmphoeHint: "Click a district on the map to see subdistricts",
+    selectedTambonTitle: "Selected subdistrict",
+    allPostcodes: "All postal codes",
+    postcodesLoading: "Loading postal codes...",
+    postcodesNotFound: "No postal codes found",
+    noTambonTitle: "No subdistrict selected",
+    noTambonHint: "Click a subdistrict on the map for details",
+    noTambonHintList: "Select a subdistrict from the list below for details",
+    backToOtherProvinces: "Back to other provinces",
+    errorAmphoe: "Unable to load district data (check your connection).",
+    errorTambon: "Unable to load subdistrict data (check your connection).",
+    errorPostcodes: "Unable to load postal codes.",
+    tambonMapUnavailableTitle: "No subdistrict map in this dataset",
+    tambonMapUnavailableHint: "Showing subdistrict list from the postal database in the sidebar",
+    tambonFallbackListTitle: "Subdistrict list from postal database",
+    tambonFallbackListHint: "Click a name to see all postal codes",
+    tambonFallbackEmpty: "No subdistricts found in the postal database"
+  }
+} as const;
+
 const normalizeProvinceName = (name: string): string => {
   if (!name) return "";
   return name
     .toLowerCase()
     .replace(/^(จ\.|จังหวัด|จ )/, "")
     .replace(/province$/i, "")
+    .replace(/metropolis$/i, "")
     .replace(/[().,ฯ'’\\-]/g, "")
     .replace(/\s+/g, " ")
     .trim();
@@ -162,8 +310,111 @@ const normalizeAdminName = (name: string): string => {
 const normalizeAdminKey = (name: string): string =>
   normalizeAdminName(name).replace(/\s+/g, "");
 
+const buildNormalizedSet = (
+  values: Array<string | undefined>,
+  normalizer: (value: string) => string
+): Set<string> => {
+  const set = new Set<string>();
+  values.forEach((value) => {
+    if (!value) return;
+    const normalized = normalizer(value);
+    if (normalized) set.add(normalized);
+  });
+  return set;
+};
+
+const setsOverlap = (a: Set<string>, b: Set<string>): boolean => {
+  if (a.size === 0 || b.size === 0) return false;
+  for (const entry of a) {
+    if (b.has(entry)) return true;
+  }
+  return false;
+};
+
 const isValidName = (value?: string): value is string =>
   Boolean(value && value !== "NA");
+
+const EARTH_RADIUS_KM = 6371;
+const formatAreaKm2 = (value: number): string =>
+  value.toLocaleString(undefined, { maximumFractionDigits: 0 });
+
+const computeFeatureAreaKm2 = (feature?: GeoJSONFeature | null): number | null => {
+  if (!feature || typeof window === "undefined" || !window.d3) return null;
+  const areaSteradians = window.d3.geoArea(feature);
+  if (typeof areaSteradians !== "number") return null;
+  return areaSteradians * EARTH_RADIUS_KM * EARTH_RADIUS_KM;
+};
+
+const buildTambonKey = (provinceName: string, amphoeName: string, tambonName: string): string => {
+  const provinceKey = normalizeProvinceKey(provinceName);
+  const amphoeKey = normalizeAdminKey(amphoeName);
+  const tambonKey = normalizeAdminKey(tambonName);
+  if (!provinceKey || !amphoeKey || !tambonKey) return "";
+  return `${provinceKey}|${amphoeKey}|${tambonKey}`;
+};
+
+const hasValidTambonName = (properties: GeoJSONProperties): boolean =>
+  isValidName(properties.NAME_3) ||
+  isValidName(properties.NL_NAME_3) ||
+  isValidName(properties.name_th) ||
+  isValidName(properties.name);
+
+const pickValidName = (...names: Array<string | undefined>): string => {
+  for (const name of names) {
+    if (isValidName(name)) return name;
+  }
+  return "";
+};
+
+const getProvinceNameEn = (properties: GeoJSONProperties): string =>
+  pickValidName(
+    properties.NAME_1,
+    properties.name,
+    properties.NL_NAME_1,
+    properties.PROV_NAM_T,
+    properties.pro_th,
+    properties.province_th,
+    properties.name_th
+  );
+
+const getProvinceNameTh = (properties: GeoJSONProperties): string =>
+  pickValidName(
+    properties.NL_NAME_1,
+    properties.PROV_NAM_T,
+    properties.pro_th,
+    properties.province_th,
+    properties.name_th
+  );
+
+const getAmphoeNameEn = (properties: GeoJSONProperties): string =>
+  pickValidName(
+    properties.NAME_2,
+    properties.name,
+    properties.NL_NAME_2,
+    properties.AMP_NAM_T,
+    properties.ap_th
+  );
+
+const getAmphoeNameTh = (properties: GeoJSONProperties): string =>
+  pickValidName(
+    properties.NL_NAME_2,
+    properties.AMP_NAM_T,
+    properties.ap_th
+  );
+
+const getTambonNameEn = (properties: GeoJSONProperties): string =>
+  pickValidName(
+    properties.NAME_3,
+    properties.name,
+    properties.NL_NAME_3,
+    properties.name_th
+  );
+
+const getTambonNameTh = (properties: GeoJSONProperties): string =>
+  pickValidName(
+    properties.NL_NAME_3,
+    properties.name_th
+  );
 
 const normalizeSearchText = (value: string): string =>
   value
@@ -229,6 +480,8 @@ export default function App() {
   const [selectedAmphoe, setSelectedAmphoe] = useState<SelectedAmphoe | null>(null);
   const [selectedTambon, setSelectedTambon] = useState<SelectedTambon | null>(null);
   const [selectedTambonPostcodes, setSelectedTambonPostcodes] = useState<string[]>([]);
+  const [selectedAmphoePostcodes, setSelectedAmphoePostcodes] = useState<string[]>([]);
+  const [selectedAmphoeAreaKm2, setSelectedAmphoeAreaKm2] = useState<number | null>(null);
   const [hoveredFeature, setHoveredFeature] = useState<string | null>(null);
   const [hoveredPosition, setHoveredPosition] = useState<{ x: number; y: number } | null>(null);
   const [focusMode, setFocusMode] = useState<boolean>(true);
@@ -249,9 +502,12 @@ export default function App() {
   const [errorPostcodes, setErrorPostcodes] = useState<string | null>(null);
   const [d3Loaded, setD3Loaded] = useState<boolean>(false);
   const [showLabels, setShowLabels] = useState<boolean>(true);
+  const [language, setLanguage] = useState<Language>('TH');
   
   const svgRef = useRef<SVGSVGElement | null>(null);
   const zoomRef = useRef<any>(null);
+
+  const t = UI_TEXT[language];
 
   // 1. Load D3
   useEffect(() => {
@@ -301,7 +557,7 @@ export default function App() {
       }
     }
 
-    setErrorAmphoe("ไม่สามารถโหลดข้อมูลอำเภอได้ (กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ต)");
+    setErrorAmphoe(UI_TEXT[language].errorAmphoe);
     setLoadingAmphoe(false);
     return null;
   };
@@ -326,7 +582,7 @@ export default function App() {
       }
     }
 
-    setErrorTambon("ไม่สามารถโหลดข้อมูลตำบลได้ (กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ต)");
+    setErrorTambon(UI_TEXT[language].errorTambon);
     setLoadingTambon(false);
     return null;
   };
@@ -352,9 +608,50 @@ export default function App() {
       }
     }
 
-    setErrorPostcodes("ไม่สามารถโหลดรหัสไปรษณีย์ได้");
+    setErrorPostcodes(UI_TEXT[language].errorPostcodes);
     setLoadingPostcodes(false);
     return null;
+  };
+
+  const provinceNameLookup = useMemo(() => {
+    const lookup = new Map<string, { th: string; en: string }>();
+    if (!postcodeData) return lookup;
+    postcodeData.provinces.forEach((province) => {
+      const en = province.provinceNameEn;
+      const th = province.provinceNameTh || province.provinceNameEn;
+      const enKey = normalizeProvinceKey(en);
+      const thKey = normalizeProvinceKey(th);
+      if (enKey) lookup.set(enKey, { th, en });
+      if (thKey && !lookup.has(thKey)) lookup.set(thKey, { th, en });
+    });
+    return lookup;
+  }, [postcodeData]);
+
+const tambonNameLookup = useMemo(() => {
+  const lookup = new Map<string, { th: string; en: string }>();
+  if (!postcodeData) return lookup;
+    const provinceByCode = new Map<number, ProvinceEntry>();
+    const districtByCode = new Map<number, DistrictEntry>();
+    postcodeData.provinces.forEach((province) => provinceByCode.set(province.provinceCode, province));
+    postcodeData.districts.forEach((district) => districtByCode.set(district.districtCode, district));
+    postcodeData.subdistricts.forEach((subdistrict) => {
+      const province = provinceByCode.get(subdistrict.provinceCode);
+      const district = districtByCode.get(subdistrict.districtCode);
+      if (!province || !district) return;
+      const key = buildTambonKey(province.provinceNameEn, district.districtNameEn, subdistrict.subdistrictNameEn);
+      if (!key) return;
+      const th = subdistrict.subdistrictNameTh || subdistrict.subdistrictNameEn;
+      const en = subdistrict.subdistrictNameEn;
+      if (!lookup.has(key)) lookup.set(key, { th, en });
+    });
+    return lookup;
+  }, [postcodeData]);
+
+  const formatDualDisplay = (preferred?: string, alternate?: string): string => {
+    if (!preferred && !alternate) return "Unknown";
+    if (!preferred) return alternate || "Unknown";
+    if (!alternate || preferred === alternate) return preferred;
+    return `${preferred} · ${alternate}`;
   };
 
   // Helpers
@@ -373,6 +670,54 @@ export default function App() {
       return properties.name || "Unknown";
   };
 
+  const getProvinceDisplayName = (properties: GeoJSONProperties): string => {
+      const nameEn = getProvinceNameEn(properties);
+      const nameTh = getProvinceNameTh(properties);
+      if (language === 'TH') {
+        if (nameTh) return nameTh;
+        const mapped = nameEn ? provinceNameLookup.get(normalizeProvinceKey(nameEn)) : undefined;
+        return mapped?.th || nameEn || nameTh || "Unknown";
+      }
+      return nameEn || nameTh || "Unknown";
+  };
+
+  const getAmphoeDisplayName = (properties: GeoJSONProperties): string => {
+      const nameTh = getAmphoeNameTh(properties);
+      const nameEn = getAmphoeNameEn(properties);
+      return language === 'TH' ? (nameTh || nameEn || "Unknown") : (nameEn || nameTh || "Unknown");
+  };
+
+  const getTambonDisplayName = (
+      properties: GeoJSONProperties,
+      provinceName?: string,
+      amphoeName?: string
+  ): string => {
+      const nameTh = getTambonNameTh(properties);
+      const nameEn = getTambonNameEn(properties);
+      const fallbackTh = nameTh || nameEn;
+      const fallbackEn = nameEn || nameTh;
+      let mappedTh: string | undefined;
+      let mappedEn: string | undefined;
+      if (provinceName && amphoeName && nameEn) {
+        const key = buildTambonKey(provinceName, amphoeName, nameEn);
+        const mapped = key ? tambonNameLookup.get(key) : undefined;
+        mappedTh = mapped?.th;
+        mappedEn = mapped?.en;
+      }
+      const finalTh = mappedTh || fallbackTh;
+      const finalEn = mappedEn || fallbackEn;
+      return language === 'TH'
+        ? formatDualDisplay(finalTh, finalEn)
+        : formatDualDisplay(finalEn, finalTh);
+  };
+
+  const getRegionLabel = (regionKey: string): string => {
+      if (language === 'TH') {
+        return REGION_CONFIG[regionKey]?.name || regionKey;
+      }
+      return REGION_LABELS_EN[regionKey] || REGION_CONFIG[regionKey]?.name || regionKey;
+  };
+
   const getProvinceNameFromFeature = (properties: GeoJSONProperties): string => {
       if (isValidName(properties.NAME_1)) return properties.NAME_1;
       if (isValidName(properties.NL_NAME_1)) return properties.NL_NAME_1;
@@ -389,6 +734,95 @@ export default function App() {
       if (properties.AMP_NAM_T) return properties.AMP_NAM_T;
       return "";
   };
+
+  const tambonMapAvailable = useMemo(() => {
+    if (viewState !== 'AMPHOE') return true;
+    if (!tambonData || !selectedProvince || !selectedAmphoe) return true;
+    const targetProvinceKey = normalizeProvinceKey(selectedProvince.name);
+    const targetAmphoeKey = normalizeAdminKey(selectedAmphoe.name);
+    const matchedFeatures = tambonData.features.filter((feature) => {
+      const provinceName = getProvinceNameFromFeature(feature.properties);
+      const amphoeName = getAmphoeNameFromTambon(feature.properties);
+      const provinceKey = normalizeProvinceKey(provinceName);
+      const amphoeKey = normalizeAdminKey(amphoeName);
+      const provinceMatch =
+        provinceKey === targetProvinceKey ||
+        provinceKey.includes(targetProvinceKey) ||
+        targetProvinceKey.includes(provinceKey);
+      const amphoeMatch =
+        amphoeKey === targetAmphoeKey ||
+        amphoeKey.includes(targetAmphoeKey) ||
+        targetAmphoeKey.includes(amphoeKey);
+      return provinceMatch && amphoeMatch;
+    });
+    if (matchedFeatures.length === 0) return false;
+    return matchedFeatures.some((feature) => hasValidTambonName(feature.properties));
+  }, [viewState, tambonData, selectedProvince, selectedAmphoe]);
+
+  useEffect(() => {
+    if (viewState !== 'AMPHOE' || tambonMapAvailable) return;
+    if (!postcodeData && !loadingPostcodes) {
+      void loadPostcodeData();
+    }
+  }, [viewState, tambonMapAvailable, postcodeData, loadingPostcodes]);
+
+  const tambonFallbackList = useMemo(() => {
+    if (!postcodeData || !selectedProvince || !selectedAmphoe) return [];
+    const provinceKey = normalizeProvinceKey(selectedProvince.name);
+    const amphoeKey = normalizeAdminKey(selectedAmphoe.name);
+
+    const provinceMatches = postcodeData.provinces.filter((province) =>
+      matchNormalizedKey(province.provinceNameEn, provinceKey, normalizeProvinceKey) ||
+      matchNormalizedKey(province.provinceNameTh, provinceKey, normalizeProvinceKey)
+    );
+    const provinceCodes = provinceMatches.map((province) => province.provinceCode);
+
+    const districtMatches = postcodeData.districts.filter((district) => {
+      if (provinceCodes.length > 0 && !provinceCodes.includes(district.provinceCode)) {
+        return false;
+      }
+      return (
+        matchNormalizedKey(district.districtNameEn, amphoeKey, normalizeAdminKey) ||
+        matchNormalizedKey(district.districtNameTh, amphoeKey, normalizeAdminKey)
+      );
+    });
+    const districtCodes = districtMatches.map((district) => district.districtCode);
+
+    const grouped = new Map<string, { nameTh: string; nameEn: string; codes: Set<string> }>();
+    postcodeData.subdistricts.forEach((subdistrict) => {
+      if (provinceCodes.length > 0 && !provinceCodes.includes(subdistrict.provinceCode)) {
+        return;
+      }
+      if (districtCodes.length > 0 && !districtCodes.includes(subdistrict.districtCode)) {
+        return;
+      }
+      const nameEn = subdistrict.subdistrictNameEn || "";
+      const nameTh = subdistrict.subdistrictNameTh || nameEn;
+      const keyBase = nameEn || nameTh;
+      const key = normalizeAdminKey(keyBase);
+      if (!key) return;
+      const existing = grouped.get(key) || { nameTh, nameEn, codes: new Set<string>() };
+      if (subdistrict.postalCode) {
+        existing.codes.add(subdistrict.postalCode.toString());
+      }
+      grouped.set(key, existing);
+    });
+
+    const list: TambonListItem[] = Array.from(grouped.values()).map((entry) => ({
+      nameTh: entry.nameTh,
+      nameEn: entry.nameEn,
+      postalCodes: Array.from(entry.codes).sort()
+    }));
+
+    const locale = language === 'TH' ? 'th' : 'en';
+    list.sort((a, b) => {
+      const aLabel = language === 'TH' ? a.nameTh : a.nameEn;
+      const bLabel = language === 'TH' ? b.nameTh : b.nameEn;
+      return aLabel.localeCompare(bLabel, locale, { sensitivity: 'base' });
+    });
+
+    return list;
+  }, [postcodeData, selectedProvince, selectedAmphoe, language]);
 
   const stopTour = () => {
     setTourActive(false);
@@ -461,6 +895,7 @@ export default function App() {
 
     setSelectedProvince({ name, region, properties: provinceFeature.properties });
     setSelectedAmphoe(null);
+    setSelectedAmphoeAreaKm2(null);
     setSelectedTambon(null);
     setSelectedTambonPostcodes([]);
     setViewState('PROVINCE');
@@ -484,11 +919,15 @@ export default function App() {
     const amphoeFeature = findAmphoeFeature(provinceDisplayName, amphoeName, amphoes);
     if (!amphoeFeature) {
       setSelectedAmphoe(null);
+      setSelectedAmphoeAreaKm2(null);
       setViewState('PROVINCE');
       return;
     }
 
     setSelectedAmphoe({ name: getThaiName(amphoeFeature.properties), properties: amphoeFeature.properties });
+    setSelectedAmphoeAreaKm2(computeFeatureAreaKm2(amphoeFeature));
+    setSelectedAmphoePostcodes([]);
+    setErrorPostcodes(null);
     setViewState('AMPHOE');
     await loadTambonData();
     void loadPostcodeData();
@@ -510,6 +949,7 @@ export default function App() {
     const amphoeFeature = findAmphoeFeature(provinceDisplayName, amphoeName, amphoes);
     if (!amphoeFeature) {
       setSelectedAmphoe(null);
+      setSelectedAmphoeAreaKm2(null);
       setSelectedTambon(null);
       setViewState('PROVINCE');
       return;
@@ -586,11 +1026,78 @@ export default function App() {
   }, [selectedTambon, selectedAmphoe, selectedProvince, postcodeData]);
 
   useEffect(() => {
+    if (!selectedAmphoe || !selectedProvince) {
+      setSelectedAmphoePostcodes([]);
+      return;
+    }
+
+    if (!postcodeData) {
+      setSelectedAmphoePostcodes([]);
+      void loadPostcodeData();
+      return;
+    }
+
+    const provinceKey = normalizeProvinceKey(selectedProvince.name);
+    const amphoeKey = normalizeAdminKey(selectedAmphoe.name);
+
+    const provinceMatches = postcodeData.provinces.filter((province) =>
+      matchNormalizedKey(province.provinceNameEn, provinceKey, normalizeProvinceKey) ||
+      matchNormalizedKey(province.provinceNameTh, provinceKey, normalizeProvinceKey)
+    );
+    const provinceCodes = provinceMatches.map((province) => province.provinceCode);
+
+    const districtMatches = postcodeData.districts.filter((district) => {
+      if (provinceCodes.length > 0 && !provinceCodes.includes(district.provinceCode)) {
+        return false;
+      }
+      return (
+        matchNormalizedKey(district.districtNameEn, amphoeKey, normalizeAdminKey) ||
+        matchNormalizedKey(district.districtNameTh, amphoeKey, normalizeAdminKey)
+      );
+    });
+    const districtCodes = districtMatches.map((district) => district.districtCode);
+
+    const codes = new Set<number>();
+    postcodeData.subdistricts.forEach((subdistrict) => {
+      if (provinceCodes.length > 0 && !provinceCodes.includes(subdistrict.provinceCode)) {
+        return;
+      }
+      if (districtCodes.length > 0 && !districtCodes.includes(subdistrict.districtCode)) {
+        return;
+      }
+      if (typeof subdistrict.postalCode === "number") {
+        codes.add(subdistrict.postalCode);
+      }
+    });
+
+    if (codes.size === 0) {
+      districtMatches.forEach((district) => {
+        if (typeof district.postalCode === "number") {
+          codes.add(district.postalCode);
+        }
+      });
+    }
+
+    const sorted = Array.from(codes)
+      .sort((a, b) => a - b)
+      .map((code) => code.toString());
+
+    setSelectedAmphoePostcodes(sorted);
+  }, [selectedAmphoe, selectedProvince, postcodeData]);
+
+  useEffect(() => {
     if (!searchTerm.trim()) return;
     if (!postcodeData && !loadingPostcodes) {
       void loadPostcodeData();
     }
   }, [searchTerm, postcodeData, loadingPostcodes]);
+
+  useEffect(() => {
+    if (language !== 'TH') return;
+    if (!postcodeData && !loadingPostcodes) {
+      void loadPostcodeData();
+    }
+  }, [language, postcodeData, loadingPostcodes]);
 
   const searchIndex = useMemo(() => {
     const items: SearchIndexItem[] = [];
@@ -601,15 +1108,15 @@ export default function App() {
 
       postcodeData.provinces.forEach((province) => {
         provinceByCode.set(province.provinceCode, province);
-        const label = province.provinceNameTh || province.provinceNameEn;
-        const sublabel = province.provinceNameTh ? province.provinceNameEn : undefined;
+        const labelTh = province.provinceNameTh || province.provinceNameEn;
+        const labelEn = province.provinceNameEn;
         const searchKey = normalizeSearchText(`${province.provinceNameTh} ${province.provinceNameEn}`);
         if (!searchKey) return;
         items.push({
           id: `province-${province.provinceCode}`,
           type: 'province',
-          label,
-          sublabel,
+          labelTh,
+          labelEn,
           provinceName: province.provinceNameEn,
           searchKey
         });
@@ -619,8 +1126,10 @@ export default function App() {
         districtByCode.set(district.districtCode, district);
         const province = provinceByCode.get(district.provinceCode);
         if (!province) return;
-        const label = district.districtNameTh || district.districtNameEn;
-        const sublabel = province.provinceNameTh || province.provinceNameEn;
+        const labelTh = district.districtNameTh || district.districtNameEn;
+        const labelEn = district.districtNameEn;
+        const sublabelTh = province.provinceNameTh || province.provinceNameEn;
+        const sublabelEn = province.provinceNameEn;
         const searchKey = normalizeSearchText(
           `${district.districtNameTh} ${district.districtNameEn} ${province.provinceNameTh} ${province.provinceNameEn}`
         );
@@ -628,8 +1137,10 @@ export default function App() {
         items.push({
           id: `amphoe-${district.districtCode}`,
           type: 'amphoe',
-          label,
-          sublabel,
+          labelTh,
+          labelEn,
+          sublabelTh,
+          sublabelEn,
           provinceName: province.provinceNameEn,
           amphoeName: district.districtNameEn,
           searchKey
@@ -640,8 +1151,10 @@ export default function App() {
         const province = provinceByCode.get(subdistrict.provinceCode);
         const district = districtByCode.get(subdistrict.districtCode);
         if (!province || !district) return;
-        const label = subdistrict.subdistrictNameTh || subdistrict.subdistrictNameEn;
-        const sublabel = `${district.districtNameTh || district.districtNameEn} • ${province.provinceNameTh || province.provinceNameEn}`;
+        const labelTh = subdistrict.subdistrictNameTh || subdistrict.subdistrictNameEn;
+        const labelEn = subdistrict.subdistrictNameEn;
+        const sublabelTh = `${district.districtNameTh || district.districtNameEn} • ${province.provinceNameTh || province.provinceNameEn}`;
+        const sublabelEn = `${district.districtNameEn} • ${province.provinceNameEn}`;
         const searchKey = normalizeSearchText(
           `${subdistrict.subdistrictNameTh} ${subdistrict.subdistrictNameEn} ${district.districtNameTh} ${district.districtNameEn} ${province.provinceNameTh} ${province.provinceNameEn}`
         );
@@ -649,8 +1162,10 @@ export default function App() {
         items.push({
           id: `tambon-${subdistrict.subdistrictCode}`,
           type: 'tambon',
-          label,
-          sublabel,
+          labelTh,
+          labelEn,
+          sublabelTh,
+          sublabelEn,
           provinceName: province.provinceNameEn,
           amphoeName: district.districtNameEn,
           tambonName: subdistrict.subdistrictNameEn,
@@ -659,21 +1174,27 @@ export default function App() {
       });
     } else if (provinceData) {
       provinceData.features.forEach((feature, index) => {
-        const label = getThaiName(feature.properties);
-        const searchKey = normalizeSearchText(label);
+        const labelEn = getProvinceNameEn(feature.properties) || getThaiName(feature.properties);
+        const labelTh =
+          getProvinceNameTh(feature.properties) ||
+          (labelEn ? provinceNameLookup.get(normalizeProvinceKey(labelEn))?.th : undefined) ||
+          labelEn;
+        const provinceName = labelEn || labelTh;
+        const searchKey = normalizeSearchText(`${labelTh} ${labelEn}`);
         if (!searchKey) return;
         items.push({
           id: `province-geo-${index}`,
           type: 'province',
-          label,
-          provinceName: label,
+          labelTh,
+          labelEn,
+          provinceName,
           searchKey
         });
       });
     }
 
     return items;
-  }, [postcodeData, provinceData]);
+  }, [postcodeData, provinceData, provinceNameLookup]);
 
   const searchResults = useMemo(() => {
     const query = normalizeSearchText(searchTerm.trim());
@@ -685,13 +1206,31 @@ export default function App() {
         const typeBoost = item.type === 'province' ? 0 : item.type === 'amphoe' ? 10 : 20;
         return { item, score: matchIndex + typeBoost };
       })
-      .filter((entry): entry is { item: SearchResult; score: number } => Boolean(entry))
-      .sort((a, b) => a.score - b.score || a.item.label.length - b.item.label.length)
+      .filter((entry): entry is { item: SearchIndexItem; score: number } => Boolean(entry))
+      .sort((a, b) => a.score - b.score || a.item.labelEn.length - b.item.labelEn.length)
       .slice(0, 12)
-      .map((entry) => entry.item);
+      .map(({ item }) => {
+        const label =
+          language === 'TH'
+            ? item.labelTh || item.labelEn
+            : item.labelEn || item.labelTh;
+        const sublabel =
+          language === 'TH'
+            ? item.sublabelTh || item.sublabelEn
+            : item.sublabelEn || item.sublabelTh;
+        return {
+          id: item.id,
+          type: item.type,
+          label,
+          sublabel,
+          provinceName: item.provinceName,
+          amphoeName: item.amphoeName,
+          tambonName: item.tambonName
+        };
+      });
 
     return scored;
-  }, [searchIndex, searchTerm]);
+  }, [searchIndex, searchTerm, language]);
 
   useEffect(() => {
     if (deepLinkApplied || !provinceData) return;
@@ -701,6 +1240,10 @@ export default function App() {
       setDeepLinkApplied(true);
       return;
     }
+
+    const langParam = params.get("lang");
+    if (langParam === "en") setLanguage("EN");
+    if (langParam === "th") setLanguage("TH");
 
     const layerParam = params.get("layer");
     if (layerParam === "area") setMapLayer("AREA");
@@ -733,6 +1276,7 @@ export default function App() {
     const amphoeParam = params.get("a");
     if (!amphoeParam) {
       setSelectedAmphoe(null);
+      setSelectedAmphoeAreaKm2(null);
       setViewState('PROVINCE');
       void loadAmphoeData();
       setDeepLinkApplied(true);
@@ -747,6 +1291,7 @@ export default function App() {
     const amphoeFeature = findAmphoeFeature(provinceName, amphoeParam, amphoeData);
     if (!amphoeFeature) {
       setSelectedAmphoe(null);
+      setSelectedAmphoeAreaKm2(null);
       setViewState('PROVINCE');
       setDeepLinkApplied(true);
       return;
@@ -782,11 +1327,12 @@ export default function App() {
     params.set("layer", mapLayer === 'AREA' ? "area" : "region");
     params.set("labels", showLabels ? "1" : "0");
     params.set("focus", focusMode ? "1" : "0");
+    if (language === 'EN') params.set("lang", "en");
 
     const query = params.toString();
     const nextUrl = query ? `${window.location.pathname}?${query}` : window.location.pathname;
     window.history.replaceState(null, "", nextUrl);
-  }, [deepLinkApplied, selectedProvince, selectedAmphoe, selectedTambon, viewState, mapLayer, showLabels, focusMode]);
+  }, [deepLinkApplied, selectedProvince, selectedAmphoe, selectedTambon, viewState, mapLayer, showLabels, focusMode, language]);
 
   // 3. Main D3 Render Logic
   useEffect(() => {
@@ -807,7 +1353,8 @@ export default function App() {
     let projection: any;
     let featuresToRender: GeoJSONFeature[] = [];
     let getFillColor: (d: GeoJSONFeature, i: number) => string;
-    let getFeatureName: (d: GeoJSONFeature) => string;
+    let getDisplayName: (d: GeoJSONFeature) => string;
+    let getSelectionName: (d: GeoJSONFeature) => string;
     const baseFillMap = new Map<GeoJSONFeature, string>();
 
     if (viewState === 'COUNTRY') {
@@ -823,17 +1370,30 @@ export default function App() {
          const pName = getThaiName(d.properties);
          return REGION_CONFIG[getRegionByProvince(pName)].color;
       };
-      getFeatureName = (d: GeoJSONFeature) => getThaiName(d.properties);
+      getDisplayName = (d: GeoJSONFeature) => getProvinceDisplayName(d.properties);
+      getSelectionName = (d: GeoJSONFeature) => getThaiName(d.properties);
 
     } else if (viewState === 'PROVINCE') {
       if (!amphoeData || !selectedProvince) return; 
 
-      const targetProvinceName = selectedProvince.name;
-      const targetKey = normalizeProvinceKey(targetProvinceName);
-      featuresToRender = amphoeData.features.filter(f => {
-         const pName = getProvinceNameFromFeature(f.properties);
-         const pKey = normalizeProvinceKey(pName);
-         return pKey === targetKey || pKey.includes(targetKey) || targetKey.includes(pKey);
+      const provinceKeys = buildNormalizedSet(
+        [
+          selectedProvince.name,
+          getProvinceNameEn(selectedProvince.properties),
+          getProvinceNameTh(selectedProvince.properties)
+        ],
+        normalizeProvinceKey
+      );
+      featuresToRender = amphoeData.features.filter((f) => {
+         const featureKeys = buildNormalizedSet(
+           [
+             getProvinceNameFromFeature(f.properties),
+             getProvinceNameEn(f.properties),
+             getProvinceNameTh(f.properties)
+           ],
+           normalizeProvinceKey
+         );
+         return setsOverlap(provinceKeys, featureKeys);
       });
 
       if (featuresToRender.length === 0) {
@@ -855,26 +1415,47 @@ export default function App() {
         .range([d3.rgb(regionColor).brighter(0.8), d3.rgb(regionColor).darker(0.3)]);
 
       getFillColor = (d: GeoJSONFeature, i: number) => colorScale(i);
-      getFeatureName = (d: GeoJSONFeature) => getThaiName(d.properties);
+      getDisplayName = (d: GeoJSONFeature) => getAmphoeDisplayName(d.properties);
+      getSelectionName = (d: GeoJSONFeature) => getThaiName(d.properties);
     } else if (viewState === 'AMPHOE') {
       if (!tambonData || !selectedProvince || !selectedAmphoe) return;
 
-      const targetProvinceKey = normalizeProvinceKey(selectedProvince.name);
-      const targetAmphoeKey = normalizeAdminKey(selectedAmphoe.name);
-      featuresToRender = tambonData.features.filter(f => {
+      const provinceKeys = buildNormalizedSet(
+        [
+          selectedProvince.name,
+          getProvinceNameEn(selectedProvince.properties),
+          getProvinceNameTh(selectedProvince.properties)
+        ],
+        normalizeProvinceKey
+      );
+      const amphoeKeys = buildNormalizedSet(
+        [
+          selectedAmphoe.name,
+          getAmphoeNameTh(selectedAmphoe.properties),
+          getAmphoeNameEn(selectedAmphoe.properties)
+        ],
+        normalizeAdminKey
+      );
+      featuresToRender = tambonData.features.filter((f) => {
          const provinceName = getProvinceNameFromFeature(f.properties);
          const amphoeName = getAmphoeNameFromTambon(f.properties);
-         const provinceKey = normalizeProvinceKey(provinceName);
-         const amphoeKey = normalizeAdminKey(amphoeName);
-         const provinceMatch =
-           provinceKey === targetProvinceKey ||
-           provinceKey.includes(targetProvinceKey) ||
-           targetProvinceKey.includes(provinceKey);
-         const amphoeMatch =
-           amphoeKey === targetAmphoeKey ||
-           amphoeKey.includes(targetAmphoeKey) ||
-           targetAmphoeKey.includes(amphoeKey);
-         return provinceMatch && amphoeMatch;
+         const provinceKeySet = buildNormalizedSet(
+           [
+             provinceName,
+             getProvinceNameEn(f.properties),
+             getProvinceNameTh(f.properties)
+           ],
+           normalizeProvinceKey
+         );
+         const amphoeKeySet = buildNormalizedSet(
+           [
+             amphoeName,
+             getAmphoeNameTh(f.properties),
+             getAmphoeNameEn(f.properties)
+           ],
+           normalizeAdminKey
+         );
+         return setsOverlap(provinceKeys, provinceKeySet) && setsOverlap(amphoeKeys, amphoeKeySet);
       });
 
       if (featuresToRender.length === 0) {
@@ -896,7 +1477,13 @@ export default function App() {
         .range([d3.rgb(regionColor).brighter(0.9), d3.rgb(regionColor).darker(0.2)]);
 
       getFillColor = (d: GeoJSONFeature, i: number) => colorScale(i);
-      getFeatureName = (d: GeoJSONFeature) => getThaiName(d.properties);
+      getDisplayName = (d: GeoJSONFeature) =>
+        getTambonDisplayName(
+          d.properties,
+          getProvinceNameEn(d.properties),
+          getAmphoeNameEn(d.properties)
+        );
+      getSelectionName = (d: GeoJSONFeature) => getThaiName(d.properties);
     }
 
     const pathGenerator = d3.geoPath().projection(projection);
@@ -912,6 +1499,9 @@ export default function App() {
     const g = svg.append("g");
     const gPaths = g.append("g").attr("class", "map-paths");
     const gLabels = g.append("g").attr("class", "map-labels");
+    const bringLabelsToFront = () => {
+      gLabels.raise();
+    };
     const getBaseFill = (d: GeoJSONFeature, i: number) => {
       const color = getFillColor(d, i);
       baseFillMap.set(d, color);
@@ -950,13 +1540,14 @@ export default function App() {
         .attr("cursor", "pointer")
         .style("transition", "all 0.2s ease")
         .on("mouseover", function(this: any, event: any, d: GeoJSONFeature) {
-            const name = getFeatureName(d);
+            const name = getDisplayName(d);
             setHoveredFeature(name);
             setHoveredPosition({ x: event.clientX, y: event.clientY });
             d3.select(this)
             .attr("fill", "#FACC15")
             .attr("stroke-width", 2)
             .raise();
+            bringLabelsToFront();
             if (focusMode && !tourActive) {
                 gPaths.selectAll("path").attr("opacity", 0.3);
                 d3.select(this).attr("opacity", 1);
@@ -981,7 +1572,7 @@ export default function App() {
             }
         })
         .on("click", async function(this: any, event: any, d: GeoJSONFeature) {
-            const name = getFeatureName(d);
+            const name = getSelectionName(d);
             stopTour();
             
             if (viewState === 'COUNTRY') {
@@ -992,7 +1583,8 @@ export default function App() {
                 await loadAmphoeData(); 
                 
                 setViewState('PROVINCE');
-                setSelectedAmphoe(null); 
+                setSelectedAmphoe(null);
+                setSelectedAmphoeAreaKm2(null);
                 setSelectedTambon(null);
                 setSelectedTambonPostcodes([]);
                 setErrorPostcodes(null);
@@ -1002,8 +1594,11 @@ export default function App() {
                     name: name,
                     properties: d.properties
                 });
+                setSelectedAmphoeAreaKm2(computeFeatureAreaKm2(d));
                 setSelectedTambon(null);
                 setSelectedTambonPostcodes([]);
+                setSelectedAmphoePostcodes([]);
+                setErrorPostcodes(null);
                 
                 await loadTambonData();
                 setViewState('AMPHOE');
@@ -1033,7 +1628,7 @@ export default function App() {
                 return "translate(" + centroid[0] + "," + centroid[1] + ")";
             })
             .attr("dy", ".35em")
-            .text((d: GeoJSONFeature) => getFeatureName(d))
+            .text((d: GeoJSONFeature) => getDisplayName(d))
             .attr("text-anchor", "middle")
             .attr("font-size", viewState === 'PROVINCE' ? "10px" : "8px") 
             .attr("font-weight", viewState === 'COUNTRY' ? "bold" : "normal")
@@ -1042,6 +1637,7 @@ export default function App() {
             .style("text-shadow", "2px 0 #fff, -2px 0 #fff, 0 2px #fff, 0 -2px #fff")
             .style("opacity", 0.9);
         }
+        bringLabelsToFront();
 
         if (viewState === 'AMPHOE' && selectedTambon) {
             const targetKey = normalizeAdminKey(selectedTambon.name);
@@ -1064,15 +1660,18 @@ export default function App() {
         applyBaseOpacity();
     }
 
-  }, [d3Loaded, provinceData, amphoeData, tambonData, viewState, selectedProvince, selectedAmphoe, selectedTambon, showLabels, mapLayer, focusMode, tourActive, tourRegionKey]);
+  }, [d3Loaded, provinceData, amphoeData, tambonData, viewState, selectedProvince, selectedAmphoe, selectedTambon, showLabels, mapLayer, focusMode, tourActive, tourRegionKey, language, provinceNameLookup, tambonNameLookup]);
 
   const handleBackToCountry = () => {
       stopTour();
       setViewState('COUNTRY');
       setSelectedAmphoe(null);
+      setSelectedAmphoeAreaKm2(null);
       setSelectedTambon(null);
       setSelectedTambonPostcodes([]);
+      setSelectedAmphoePostcodes([]);
       setSelectedProvince(null);
+      setSelectedAmphoeAreaKm2(null);
       setErrorAmphoe(null);
       setErrorTambon(null);
       setErrorPostcodes(null);
@@ -1083,6 +1682,8 @@ export default function App() {
       setViewState('PROVINCE');
       setSelectedTambon(null);
       setSelectedTambonPostcodes([]);
+      setSelectedAmphoePostcodes([]);
+      setSelectedAmphoeAreaKm2(null);
       setErrorTambon(null);
       setErrorPostcodes(null);
   };
@@ -1127,6 +1728,20 @@ export default function App() {
     if (result.type === 'tambon' && result.amphoeName && result.tambonName) {
       await selectTambonByName(result.provinceName, result.amphoeName, result.tambonName);
     }
+  };
+
+  const handleTambonListSelect = (item: TambonListItem) => {
+    const nameEn = item.nameEn || item.nameTh;
+    if (!nameEn) return;
+    setSelectedTambon({
+      name: nameEn,
+      properties: {
+        NAME_3: item.nameEn,
+        NL_NAME_3: item.nameTh
+      }
+    });
+    setSelectedTambonPostcodes([]);
+    void loadPostcodeData();
   };
 
   const handleToggleTour = () => {
@@ -1199,7 +1814,21 @@ export default function App() {
   }, [tourActive, tourIndex, viewState, provinceData, handleRegionClick]);
 
   const hoverTypeLabel =
-    viewState === 'COUNTRY' ? 'จังหวัด' : viewState === 'PROVINCE' ? 'อำเภอ' : 'ตำบล';
+    viewState === 'COUNTRY' ? t.typeProvince : viewState === 'PROVINCE' ? t.typeAmphoe : t.typeTambon;
+
+  const selectedProvinceLabel = selectedProvince ? getProvinceDisplayName(selectedProvince.properties) : "";
+  const selectedAmphoeLabel = selectedAmphoe ? getAmphoeDisplayName(selectedAmphoe.properties) : "";
+  const selectedTambonLabel = selectedTambon
+    ? getTambonDisplayName(
+        selectedTambon.properties,
+        getProvinceNameEn(selectedTambon.properties),
+        getAmphoeNameEn(selectedTambon.properties)
+      )
+    : "";
+  const showTambonMap = viewState !== 'AMPHOE' || tambonMapAvailable;
+  const selectedTambonKey = selectedTambon ? normalizeAdminKey(selectedTambon.name) : "";
+  const amphoePostalPreview = selectedAmphoePostcodes.slice(0, 4);
+  const amphoePostalRemaining = selectedAmphoePostcodes.length - amphoePostalPreview.length;
 
   return (
     <div className="min-h-screen bg-stone-50 font-sans text-stone-800 relative overflow-hidden">
@@ -1216,10 +1845,10 @@ export default function App() {
             <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 mb-4"></div>
             <p className="text-xl font-bold text-blue-800">
                 {loading
-                  ? "กำลังโหลดแผนที่ประเทศไทย..."
+                  ? t.loadingCountry
                   : loadingAmphoe
-                    ? "กำลังโหลดข้อมูลอำเภอ..."
-                    : "กำลังโหลดข้อมูลตำบล..."}
+                    ? t.loadingAmphoe
+                    : t.loadingTambon}
             </p>
           </div>
         )}
@@ -1227,13 +1856,13 @@ export default function App() {
         {(errorAmphoe || errorTambon) && (
             <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 bg-red-50 p-6 rounded-xl border border-red-200 shadow-xl text-center max-w-sm">
                 <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-3" />
-                <h3 className="text-lg font-bold text-red-700 mb-2">เกิดข้อผิดพลาด</h3>
+                <h3 className="text-lg font-bold text-red-700 mb-2">{t.errorTitle}</h3>
                 <p className="text-red-600 mb-4">{errorTambon || errorAmphoe}</p>
                 <button 
                     onClick={handleBackToCountry}
                     className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
                 >
-                    กลับไปหน้าหลัก
+                    {t.errorBackHome}
                 </button>
             </div>
         )}
@@ -1248,21 +1877,21 @@ export default function App() {
                         onClick={handleBackToProvince}
                         className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-lg transition-all transform hover:scale-105 font-bold"
                     >
-                        <ChevronLeft className="w-5 h-5" /> กลับไปเลือกอำเภอ
+                        <ChevronLeft className="w-5 h-5" /> {t.backToAmphoe}
                     </button>
                 ) : viewState === 'PROVINCE' ? (
                     <button 
                         onClick={handleBackToCountry}
                         className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-lg transition-all transform hover:scale-105 font-bold"
                     >
-                        <ChevronLeft className="w-5 h-5" /> กลับไปหน้าประเทศไทย
+                        <ChevronLeft className="w-5 h-5" /> {t.backToCountry}
                     </button>
                 ) : (
                     <div className="bg-white/80 backdrop-blur-md px-4 py-2 rounded-xl shadow-lg border border-white/50">
                         <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                            <Compass className="w-6 h-6 text-blue-600" /> แผนที่ประเทศไทย
+                            <Compass className="w-6 h-6 text-blue-600" /> {t.mapTitle}
                         </h2>
-                        <p className="text-xs text-slate-500 mt-1">คลิกที่จังหวัดเพื่อดูรายอำเภอ</p>
+                        <p className="text-xs text-slate-500 mt-1">{t.mapSubtitle}</p>
                     </div>
                 )}
 
@@ -1275,7 +1904,7 @@ export default function App() {
                       }`}
                     >
                       <Type className="w-4 h-4" /> 
-                      {showLabels ? "ซ่อนชื่อ" : "แสดงชื่อ"}
+                      {showLabels ? t.toggleLabelsHide : t.toggleLabelsShow}
                     </button>
                     <button 
                       onClick={() => setFocusMode(!focusMode)}
@@ -1283,7 +1912,7 @@ export default function App() {
                         focusMode ? "bg-emerald-600 text-white border-emerald-600" : "bg-white hover:bg-slate-50 text-slate-700 border-slate-200"
                       }`}
                     >
-                      <Sparkles className="w-4 h-4" /> โหมดโฟกัส
+                      <Sparkles className="w-4 h-4" /> {t.focusMode}
                     </button>
                     <button 
                       onClick={handleCopyLink}
@@ -1291,7 +1920,7 @@ export default function App() {
                         copiedLink ? "bg-blue-600 text-white border-blue-600" : "bg-white hover:bg-slate-50 text-slate-700 border-slate-200"
                       }`}
                     >
-                      <Share2 className="w-4 h-4" /> {copiedLink ? "คัดลอกแล้ว" : "แชร์ลิงก์"}
+                      <Share2 className="w-4 h-4" /> {copiedLink ? t.linkCopied : t.shareLink}
                     </button>
                   </div>
                   <div className="flex items-center gap-2">
@@ -1303,7 +1932,7 @@ export default function App() {
                           mapLayer === 'REGION' ? "bg-white text-slate-800 shadow" : "text-slate-500 hover:text-slate-700"
                         }`}
                       >
-                        ภูมิภาค
+                        {t.layerRegion}
                       </button>
                       <button
                         onClick={() => setMapLayer('AREA')}
@@ -1311,7 +1940,28 @@ export default function App() {
                           mapLayer === 'AREA' ? "bg-white text-slate-800 shadow" : "text-slate-500 hover:text-slate-700"
                         }`}
                       >
-                        ขนาดพื้นที่
+                        {t.layerArea}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Languages className="w-4 h-4 text-slate-400" />
+                    <div className="flex items-center gap-1 bg-slate-100 rounded-full p-1">
+                      <button
+                        onClick={() => setLanguage('TH')}
+                        className={`px-3 py-1 rounded-full text-[11px] font-semibold transition ${
+                          language === 'TH' ? "bg-white text-slate-800 shadow" : "text-slate-500 hover:text-slate-700"
+                        }`}
+                      >
+                        ไทย
+                      </button>
+                      <button
+                        onClick={() => setLanguage('EN')}
+                        className={`px-3 py-1 rounded-full text-[11px] font-semibold transition ${
+                          language === 'EN' ? "bg-white text-slate-800 shadow" : "text-slate-500 hover:text-slate-700"
+                        }`}
+                      >
+                        English
                       </button>
                     </div>
                   </div>
@@ -1323,7 +1973,7 @@ export default function App() {
                     <input
                       value={searchTerm}
                       onChange={(event) => setSearchTerm(event.target.value)}
-                      placeholder="ค้นหาจังหวัด/อำเภอ/ตำบล"
+                      placeholder={t.searchPlaceholder}
                       className="flex-1 bg-transparent text-sm text-slate-700 placeholder:text-slate-400 outline-none"
                     />
                     {searchTerm && (
@@ -1338,10 +1988,10 @@ export default function App() {
                   {searchTerm && (
                     <div className="mt-2 max-h-64 overflow-auto space-y-1">
                       {loadingPostcodes && !postcodeData && (
-                        <p className="text-xs text-slate-500 px-2 py-1.5">กำลังโหลดฐานข้อมูลค้นหา...</p>
+                        <p className="text-xs text-slate-500 px-2 py-1.5">{t.searchLoading}</p>
                       )}
                       {searchResults.length === 0 && !loadingPostcodes && (
-                        <p className="text-xs text-slate-500 px-2 py-1.5">ไม่พบผลลัพธ์</p>
+                        <p className="text-xs text-slate-500 px-2 py-1.5">{t.searchNoResults}</p>
                       )}
                       {searchResults.map((result) => (
                         <button
@@ -1361,7 +2011,7 @@ export default function App() {
                                     : "bg-amber-100 text-amber-700"
                               }`}
                             >
-                              {result.type === 'province' ? "จังหวัด" : result.type === 'amphoe' ? "อำเภอ" : "ตำบล"}
+                              {result.type === 'province' ? t.typeProvince : result.type === 'amphoe' ? t.typeAmphoe : t.typeTambon}
                             </span>
                           </div>
                           {result.sublabel && (
@@ -1374,26 +2024,37 @@ export default function App() {
                 </div>
             </div>
 
+            {viewState === 'AMPHOE' && !tambonMapAvailable && (
+              <div className="absolute inset-0 z-20 flex items-center justify-center">
+                <div className="bg-white/90 backdrop-blur-md px-5 py-4 rounded-2xl shadow-lg border border-white/60 text-center max-w-xs">
+                  <p className="text-sm font-semibold text-slate-700">{t.tambonMapUnavailableTitle}</p>
+                  <p className="text-xs text-slate-500 mt-1">{t.tambonMapUnavailableHint}</p>
+                </div>
+              </div>
+            )}
+
             {/* Zoom Controls */}
-            <div className="absolute bottom-8 right-8 flex flex-col gap-2 z-20">
-                <button 
-                    onClick={() => handleZoom(1.3)}
-                    className="p-3 bg-white hover:bg-slate-50 text-slate-700 rounded-full shadow-lg border border-slate-200 transition-transform active:scale-95"
-                >
-                    <Plus className="w-6 h-6" />
-                </button>
-                <button 
-                    onClick={() => handleZoom(0.7)}
-                    className="p-3 bg-white hover:bg-slate-50 text-slate-700 rounded-full shadow-lg border border-slate-200 transition-transform active:scale-95"
-                >
-                    <Minus className="w-6 h-6" />
-                </button>
-            </div>
+            {showTambonMap && (
+              <div className="absolute bottom-8 right-8 flex flex-col gap-2 z-20">
+                  <button 
+                      onClick={() => handleZoom(1.3)}
+                      className="p-3 bg-white hover:bg-slate-50 text-slate-700 rounded-full shadow-lg border border-slate-200 transition-transform active:scale-95"
+                  >
+                      <Plus className="w-6 h-6" />
+                  </button>
+                  <button 
+                      onClick={() => handleZoom(0.7)}
+                      className="p-3 bg-white hover:bg-slate-50 text-slate-700 rounded-full shadow-lg border border-slate-200 transition-transform active:scale-95"
+                  >
+                      <Minus className="w-6 h-6" />
+                  </button>
+              </div>
+            )}
 
             {/* Legend */}
             {viewState === 'COUNTRY' && (
                 <div className="absolute bottom-8 left-8 bg-white/90 backdrop-blur-sm p-4 rounded-xl shadow-lg border border-slate-100 z-20 hidden md:block">
-                    <h3 className="text-sm font-bold text-slate-700 mb-3">ภูมิภาค</h3>
+                    <h3 className="text-sm font-bold text-slate-700 mb-3">{t.legendTitle}</h3>
                     <div className="space-y-2">
                         {Object.entries(REGION_CONFIG).map(([key, config]) => (
                             <div 
@@ -1402,15 +2063,15 @@ export default function App() {
                                 onClick={() => handleRegionClick(key)}
                             >
                                 <span className="w-3 h-3 rounded-full shadow-sm" style={{ backgroundColor: config.color }}></span>
-                                <span className="text-xs text-slate-600">{config.name}</span>
+                                <span className="text-xs text-slate-600">{getRegionLabel(key)}</span>
                             </div>
                         ))}
                     </div>
                     {mapLayer === 'AREA' && (
                       <div className="mt-4">
                         <div className="flex items-center justify-between text-[10px] text-slate-500 mb-1">
-                          <span>เล็ก</span>
-                          <span>ใหญ่</span>
+                          <span>{t.legendSmall}</span>
+                          <span>{t.legendLarge}</span>
                         </div>
                         <div className="h-2 rounded-full bg-gradient-to-r from-emerald-100 via-cyan-400 to-blue-700"></div>
                       </div>
@@ -1423,12 +2084,12 @@ export default function App() {
                         }`}
                       >
                         {tourActive ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-                        {tourActive ? "หยุดทัวร์ภาค" : "เริ่มทัวร์ภาค"}
+                        {tourActive ? t.tourStop : t.tourStart}
                       </button>
                       {tourActive && tourRegionKey && (
                         <div className="mt-2 flex items-center gap-2 text-[11px] text-slate-500">
                           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                          กำลังพาเที่ยว {REGION_CONFIG[tourRegionKey].name}
+                          {t.touringPrefix} {getRegionLabel(tourRegionKey)}
                         </div>
                       )}
                     </div>
@@ -1445,19 +2106,21 @@ export default function App() {
                   <p className="text-sm font-bold leading-tight">{hoveredFeature}</p>
                   {viewState === 'COUNTRY' && (
                     <p className="text-[10px] text-slate-400 mt-0.5">
-                      {REGION_CONFIG[getRegionByProvince(hoveredFeature)].name}
+                      {getRegionLabel(getRegionByProvince(hoveredFeature))}
                     </p>
                   )}
                </div>
             )}
 
             {/* SVG Render */}
-            <svg 
-                ref={svgRef} 
-                viewBox="0 0 800 1200" 
-                className="w-full h-full transition-all duration-700 ease-in-out drop-shadow-2xl"
-                style={{ filter: "drop-shadow(0px 15px 15px rgba(0,0,0,0.15))" }}
-            ></svg>
+            {showTambonMap && (
+              <svg 
+                  ref={svgRef} 
+                  viewBox="0 0 800 1200" 
+                  className="w-full h-full transition-all duration-700 ease-in-out drop-shadow-2xl"
+                  style={{ filter: "drop-shadow(0px 15px 15px rgba(0,0,0,0.15))" }}
+              ></svg>
+            )}
         </div>
       </div>
 
@@ -1470,7 +2133,7 @@ export default function App() {
         <div className="p-6 border-b border-slate-100 bg-white/50 sticky top-0 z-10 flex justify-between items-center">
             <h1 className="text-lg font-bold text-slate-800 flex items-center gap-2">
                 <Info className="w-5 h-5 text-blue-500" /> 
-                {viewState === 'AMPHOE' ? 'ข้อมูลตำบล' : viewState === 'PROVINCE' ? 'ข้อมูลอำเภอ' : 'ข้อมูลจังหวัด'}
+                {viewState === 'AMPHOE' ? t.sidebarTitleTambon : viewState === 'PROVINCE' ? t.sidebarTitleAmphoe : t.sidebarTitleProvince}
             </h1>
             <button onClick={handleBackToCountry} className="p-2 bg-slate-100 rounded-full hover:bg-slate-200 transition">
                 <X className="w-4 h-4" />
@@ -1483,26 +2146,26 @@ export default function App() {
                <div className="bg-slate-100 p-6 rounded-full mb-6">
                   <MapPin className="w-12 h-12 text-slate-300" />
                </div>
-               <p className="text-lg font-medium text-slate-600">เลือกจังหวัดเพื่อดูข้อมูลลึก</p>
+               <p className="text-lg font-medium text-slate-600">{t.emptyCountryTitle}</p>
                <p className="text-sm text-slate-400 mt-2 text-center max-w-[200px]">
-                   คลิกที่จังหวัดใดก็ได้ เช่น "เชียงราย" ระบบจะแสดงแผนที่รายอำเภอ
+                   {t.emptyCountryHint}
                </p>
             </div>
           ) : selectedProvince ? (
             <div className="space-y-6 animate-fade-in">
                  <div className="flex items-center gap-2 text-sm text-slate-500 mb-2">
-                    <span onClick={handleBackToCountry} className="cursor-pointer hover:text-blue-600">ประเทศไทย</span>
+                    <span onClick={handleBackToCountry} className="cursor-pointer hover:text-blue-600">{t.breadcrumbCountry}</span>
                     <span>/</span>
                     <span
                       onClick={viewState === 'AMPHOE' ? handleBackToProvince : undefined}
                       className={`font-bold text-slate-800 ${viewState === 'AMPHOE' ? 'cursor-pointer hover:text-blue-600' : ''}`}
                     >
-                      {selectedProvince.name}
+                      {selectedProvinceLabel}
                     </span>
                     {viewState === 'AMPHOE' && selectedAmphoe && (
                       <>
                         <span>/</span>
-                        <span className="font-bold text-slate-800">{selectedAmphoe.name}</span>
+                        <span className="font-bold text-slate-800">{selectedAmphoeLabel}</span>
                       </>
                     )}
                  </div>
@@ -1510,48 +2173,143 @@ export default function App() {
                  <div className="text-center pb-6 border-b border-slate-100">
                     <span className="inline-block px-4 py-1.5 rounded-full text-xs font-bold tracking-wider uppercase text-white mb-3 shadow-sm" 
                           style={{ backgroundColor: REGION_CONFIG[selectedProvince.region].color }}>
-                      {REGION_CONFIG[selectedProvince.region].name}
+                      {getRegionLabel(selectedProvince.region)}
                     </span>
-                    <h2 className="text-4xl font-extrabold text-slate-800">{selectedProvince.name}</h2>
+                    <h2 className="text-4xl font-extrabold text-slate-800">{selectedProvinceLabel}</h2>
                  </div>
 
                  {selectedAmphoe ? (
                      <div className="bg-blue-50 p-5 rounded-2xl border border-blue-100 animate-slide-up">
                         <h3 className="text-xs font-bold text-blue-400 uppercase mb-3 tracking-wide flex items-center gap-2">
-                             <MapPin className="w-4 h-4" /> อำเภอที่เลือก
+                             <MapPin className="w-4 h-4" /> {t.selectedAmphoeTitle}
                         </h3>
-                        <p className="text-2xl font-bold text-blue-900 mb-2">{selectedAmphoe.name}</p>
+                        <p className="text-2xl font-bold text-blue-900 mb-2">{selectedAmphoeLabel}</p>
                         <div className="grid grid-cols-2 gap-3 mt-4">
                              <div className="bg-white p-3 rounded-lg text-center shadow-sm">
-                                 <p className="text-xs text-slate-400">รหัสไปรษณีย์</p>
-                                 <p className="font-bold text-slate-700">{(Math.random()*10000 + 50000).toFixed(0)}</p>
+                                 <p className="text-xs text-slate-400">{t.allPostcodes}</p>
+                                 {loadingPostcodes ? (
+                                   <p className="text-xs text-slate-500 mt-2">{t.postcodesLoading}</p>
+                                 ) : errorPostcodes ? (
+                                   <p className="text-xs text-red-600 mt-2">{errorPostcodes}</p>
+                                 ) : selectedAmphoePostcodes.length > 0 ? (
+                                   <div className="mt-2 flex flex-wrap justify-center gap-1">
+                                     {amphoePostalPreview.map((code) => (
+                                       <span
+                                         key={code}
+                                         className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-semibold"
+                                       >
+                                         {code}
+                                       </span>
+                                     ))}
+                                     {amphoePostalRemaining > 0 && (
+                                       <span className="px-2 py-0.5 rounded-full bg-slate-200 text-slate-600 text-[10px] font-semibold">
+                                         +{amphoePostalRemaining}
+                                       </span>
+                                     )}
+                                   </div>
+                                 ) : (
+                                   <p className="text-xs text-slate-500 mt-2">{t.postcodesNotFound}</p>
+                                 )}
                              </div>
                              <div className="bg-white p-3 rounded-lg text-center shadow-sm">
-                                 <p className="text-xs text-slate-400">พื้นที่ (km²)</p>
-                                 <p className="font-bold text-slate-700">{(Math.random()*500 + 100).toFixed(0)}</p>
+                                 <p className="text-xs text-slate-400">{t.area}</p>
+                                 <p className="font-bold text-slate-700">
+                                   {selectedAmphoeAreaKm2 != null
+                                     ? `${formatAreaKm2(selectedAmphoeAreaKm2)} km²`
+                                     : t.areaUnknown}
+                                 </p>
                              </div>
-                        </div>
-                     </div>
+                       </div>
+                    </div>
                  ) : viewState === 'PROVINCE' ? (
                      <div className="bg-slate-50 p-5 rounded-2xl border border-dashed border-slate-300 text-center py-8">
-                         <p className="text-slate-400 mb-2">ยังไม่ได้เลือกอำเภอ</p>
-                         <p className="text-sm text-slate-500">คลิกที่อำเภอในแผนที่เพื่อดูตำบล</p>
+                         <p className="text-slate-400 mb-2">{t.noAmphoeTitle}</p>
+                         <p className="text-sm text-slate-500">{t.noAmphoeHint}</p>
                      </div>
                  ) : null}
+
+                 {viewState === 'AMPHOE' && (
+                   !tambonMapAvailable && (
+                     <div className="bg-white/90 p-5 rounded-2xl border border-slate-100 shadow-sm">
+                        <div className="flex items-center justify-between gap-2 mb-3">
+                          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wide">
+                            {t.tambonFallbackListTitle}
+                          </h3>
+                        </div>
+                        <p className="text-xs text-slate-400 mb-3">{t.tambonFallbackListHint}</p>
+                        {loadingPostcodes ? (
+                          <p className="text-sm text-slate-500">{t.postcodesLoading}</p>
+                        ) : errorPostcodes ? (
+                          <p className="text-sm text-red-600">{errorPostcodes}</p>
+                        ) : tambonFallbackList.length > 0 ? (
+                          <div className="space-y-2 max-h-64 overflow-auto pr-1">
+                            {tambonFallbackList.map((item) => {
+                              const displayName = language === 'TH' ? item.nameTh : item.nameEn;
+                              const itemKey = normalizeAdminKey(item.nameEn || item.nameTh);
+                              const isSelected = Boolean(selectedTambonKey && itemKey === selectedTambonKey);
+                              const visibleCodes = item.postalCodes.slice(0, 5);
+                              const remaining = item.postalCodes.length - visibleCodes.length;
+                              return (
+                                <button
+                                  key={`${itemKey}-${item.nameEn}`}
+                                  onClick={() => handleTambonListSelect(item)}
+                                  className={`w-full text-left px-3 py-2 rounded-xl border transition ${
+                                    isSelected
+                                      ? "border-emerald-400 bg-emerald-50"
+                                      : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+                                  }`}
+                                >
+                                  <div className="flex items-center justify-between gap-2">
+                                    <span className="text-sm font-semibold text-slate-700">
+                                      {displayName || item.nameEn || item.nameTh}
+                                    </span>
+                                    {item.postalCodes.length > 0 && (
+                                      <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-slate-100 text-slate-600">
+                                        {item.postalCodes.length} {t.postalCode}
+                                      </span>
+                                    )}
+                                  </div>
+                                  {item.postalCodes.length > 0 && (
+                                    <div className="mt-2 flex flex-wrap gap-1">
+                                      {visibleCodes.map((code) => (
+                                        <span
+                                          key={code}
+                                          className="px-2 py-0.5 rounded-full bg-white text-slate-600 text-[10px] font-semibold border border-slate-200"
+                                        >
+                                          {code}
+                                        </span>
+                                      ))}
+                                      {remaining > 0 && (
+                                        <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-semibold">
+                                          +{remaining}
+                                        </span>
+                                      )}
+                                    </div>
+                                  )}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-slate-500">{t.tambonFallbackEmpty}</p>
+                        )}
+                     </div>
+                   )
+                 )}
 
                  {viewState === 'AMPHOE' && (
                    selectedTambon ? (
                      <div className="bg-emerald-50 p-5 rounded-2xl border border-emerald-100 animate-slide-up">
                         <h3 className="text-xs font-bold text-emerald-500 uppercase mb-3 tracking-wide flex items-center gap-2">
-                             <MapPin className="w-4 h-4" /> ตำบลที่เลือก
+                             <MapPin className="w-4 h-4" /> {t.selectedTambonTitle}
                         </h3>
-                        <p className="text-2xl font-bold text-emerald-900 mb-2">{selectedTambon.name}</p>
+                        <p className="text-2xl font-bold text-emerald-900 mb-2">{selectedTambonLabel}</p>
                         <div className="mt-4">
                             <p className="text-xs font-bold text-emerald-600 uppercase tracking-wide">
-                              รหัสไปรษณีย์ทั้งหมด
+                              {t.allPostcodes}
                             </p>
                             {loadingPostcodes ? (
-                              <p className="text-sm text-slate-500 mt-2">กำลังโหลดรหัสไปรษณีย์...</p>
+                              <p className="text-sm text-slate-500 mt-2">{t.postcodesLoading}</p>
                             ) : errorPostcodes ? (
                               <p className="text-sm text-red-600 mt-2">{errorPostcodes}</p>
                             ) : selectedTambonPostcodes.length > 0 ? (
@@ -1566,14 +2324,16 @@ export default function App() {
                                 ))}
                               </div>
                             ) : (
-                              <p className="text-sm text-slate-500 mt-2">ไม่พบรหัสไปรษณีย์</p>
+                              <p className="text-sm text-slate-500 mt-2">{t.postcodesNotFound}</p>
                             )}
                         </div>
                      </div>
                    ) : (
                      <div className="bg-slate-50 p-5 rounded-2xl border border-dashed border-slate-300 text-center py-8">
-                         <p className="text-slate-400 mb-2">ยังไม่ได้เลือกตำบล</p>
-                         <p className="text-sm text-slate-500">คลิกที่พื้นที่ในแผนที่เพื่อดูข้อมูลตำบล</p>
+                         <p className="text-slate-400 mb-2">{t.noTambonTitle}</p>
+                         <p className="text-sm text-slate-500">
+                           {tambonMapAvailable ? t.noTambonHint : t.noTambonHintList}
+                         </p>
                      </div>
                    )
                  )}
@@ -1582,11 +2342,11 @@ export default function App() {
                     onClick={viewState === 'AMPHOE' ? handleBackToProvince : handleBackToCountry}
                     className="w-full py-3 px-4 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl transition-colors flex items-center justify-center gap-2 font-medium mt-auto"
                  >
-                    <ChevronLeft className="w-5 h-5" /> {viewState === 'AMPHOE' ? 'กลับไปเลือกอำเภอ' : 'กลับไปเลือกจังหวัดอื่น'}
+                    <ChevronLeft className="w-5 h-5" /> {viewState === 'AMPHOE' ? t.backToAmphoe : t.backToOtherProvinces}
                  </button>
             </div>
           ) : (
-             <div>Loading...</div>
+             <div>{t.loadingFallback}</div>
           )}
 
         </div>
