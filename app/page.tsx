@@ -41,7 +41,7 @@ interface GeoJSONProperties {
 interface GeoJSONFeature {
   type: "Feature";
   properties: GeoJSONProperties;
-  geometry: any; 
+  geometry: any;
 }
 
 interface GeoJSONData {
@@ -475,7 +475,7 @@ export default function App() {
   const [amphoeData, setAmphoeData] = useState<GeoJSONData | null>(null);
   const [tambonData, setTambonData] = useState<GeoJSONData | null>(null);
   const [postcodeData, setPostcodeData] = useState<PostcodeData | null>(null);
-  
+
   const [selectedProvince, setSelectedProvince] = useState<SelectedProvince | null>(null);
   const [selectedAmphoe, setSelectedAmphoe] = useState<SelectedAmphoe | null>(null);
   const [selectedTambon, setSelectedTambon] = useState<SelectedTambon | null>(null);
@@ -492,7 +492,7 @@ export default function App() {
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [copiedLink, setCopiedLink] = useState<boolean>(false);
   const [deepLinkApplied, setDeepLinkApplied] = useState<boolean>(false);
-  
+
   const [loading, setLoading] = useState<boolean>(true);
   const [loadingAmphoe, setLoadingAmphoe] = useState<boolean>(false);
   const [loadingTambon, setLoadingTambon] = useState<boolean>(false);
@@ -503,7 +503,7 @@ export default function App() {
   const [d3Loaded, setD3Loaded] = useState<boolean>(false);
   const [showLabels, setShowLabels] = useState<boolean>(true);
   const [language, setLanguage] = useState<Language>('TH');
-  
+
   const svgRef = useRef<SVGSVGElement | null>(null);
   const zoomRef = useRef<any>(null);
 
@@ -523,22 +523,22 @@ export default function App() {
   useEffect(() => {
     fetch(URL_PROVINCES)
       .then(res => {
-         if(!res.ok) throw new Error("Failed to load province data");
-         return res.json();
+        if (!res.ok) throw new Error("Failed to load province data");
+        return res.json();
       })
       .then((data: GeoJSONData) => {
         setProvinceData(data);
         setLoading(false);
       })
       .catch(err => {
-          console.error("Err loading provinces:", err);
-          setLoading(false);
+        console.error("Err loading provinces:", err);
+        setLoading(false);
       });
   }, []);
 
   // Function to load Amphoe data with types
   const loadAmphoeData = async (): Promise<GeoJSONData | null> => {
-    if (amphoeData) return amphoeData; 
+    if (amphoeData) return amphoeData;
     setLoadingAmphoe(true);
     setErrorAmphoe(null);
 
@@ -546,12 +546,12 @@ export default function App() {
       try {
         console.log(`Trying to load amphoes from: ${url}`);
         const res = await fetch(url);
-        if(!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
         const data: GeoJSONData = await res.json();
-        
+
         setAmphoeData(data);
         setLoadingAmphoe(false);
-        return data; 
+        return data;
       } catch (err) {
         console.warn(`Failed to load from ${url}:`, err);
       }
@@ -627,9 +627,9 @@ export default function App() {
     return lookup;
   }, [postcodeData]);
 
-const tambonNameLookup = useMemo(() => {
-  const lookup = new Map<string, { th: string; en: string }>();
-  if (!postcodeData) return lookup;
+  const tambonNameLookup = useMemo(() => {
+    const lookup = new Map<string, { th: string; en: string }>();
+    if (!postcodeData) return lookup;
     const provinceByCode = new Map<number, ProvinceEntry>();
     const districtByCode = new Map<number, DistrictEntry>();
     postcodeData.provinces.forEach((province) => provinceByCode.set(province.provinceCode, province));
@@ -656,83 +656,83 @@ const tambonNameLookup = useMemo(() => {
 
   // Helpers
   const getThaiName = (properties: GeoJSONProperties): string => {
-      if (isValidName(properties.NL_NAME_3)) return properties.NL_NAME_3;
-      if (isValidName(properties.NAME_3)) return properties.NAME_3;
-      if (isValidName(properties.NL_NAME_2)) return properties.NL_NAME_2;
-      if (properties.name_th) return properties.name_th;
-      if (properties.pro_th) return properties.pro_th;
-      if (properties.ap_th) return properties.ap_th;
-      if (properties.AMP_NAM_T) return properties.AMP_NAM_T;
-      if (properties.PROV_NAM_T) return properties.PROV_NAM_T;
-      if (isValidName(properties.NAME_2)) return properties.NAME_2;
-      if (isValidName(properties.NL_NAME_1)) return properties.NL_NAME_1;
-      if (isValidName(properties.NAME_1)) return properties.NAME_1;
-      return properties.name || "Unknown";
+    if (isValidName(properties.NL_NAME_3)) return properties.NL_NAME_3;
+    if (isValidName(properties.NAME_3)) return properties.NAME_3;
+    if (isValidName(properties.NL_NAME_2)) return properties.NL_NAME_2;
+    if (properties.name_th) return properties.name_th;
+    if (properties.pro_th) return properties.pro_th;
+    if (properties.ap_th) return properties.ap_th;
+    if (properties.AMP_NAM_T) return properties.AMP_NAM_T;
+    if (properties.PROV_NAM_T) return properties.PROV_NAM_T;
+    if (isValidName(properties.NAME_2)) return properties.NAME_2;
+    if (isValidName(properties.NL_NAME_1)) return properties.NL_NAME_1;
+    if (isValidName(properties.NAME_1)) return properties.NAME_1;
+    return properties.name || "Unknown";
   };
 
   const getProvinceDisplayName = (properties: GeoJSONProperties): string => {
-      const nameEn = getProvinceNameEn(properties);
-      const nameTh = getProvinceNameTh(properties);
-      if (language === 'TH') {
-        if (nameTh) return nameTh;
-        const mapped = nameEn ? provinceNameLookup.get(normalizeProvinceKey(nameEn)) : undefined;
-        return mapped?.th || nameEn || nameTh || "Unknown";
-      }
-      return nameEn || nameTh || "Unknown";
+    const nameEn = getProvinceNameEn(properties);
+    const nameTh = getProvinceNameTh(properties);
+    if (language === 'TH') {
+      if (nameTh) return nameTh;
+      const mapped = nameEn ? provinceNameLookup.get(normalizeProvinceKey(nameEn)) : undefined;
+      return mapped?.th || nameEn || nameTh || "Unknown";
+    }
+    return nameEn || nameTh || "Unknown";
   };
 
   const getAmphoeDisplayName = (properties: GeoJSONProperties): string => {
-      const nameTh = getAmphoeNameTh(properties);
-      const nameEn = getAmphoeNameEn(properties);
-      return language === 'TH' ? (nameTh || nameEn || "Unknown") : (nameEn || nameTh || "Unknown");
+    const nameTh = getAmphoeNameTh(properties);
+    const nameEn = getAmphoeNameEn(properties);
+    return language === 'TH' ? (nameTh || nameEn || "Unknown") : (nameEn || nameTh || "Unknown");
   };
 
   const getTambonDisplayName = (
-      properties: GeoJSONProperties,
-      provinceName?: string,
-      amphoeName?: string
+    properties: GeoJSONProperties,
+    provinceName?: string,
+    amphoeName?: string
   ): string => {
-      const nameTh = getTambonNameTh(properties);
-      const nameEn = getTambonNameEn(properties);
-      const fallbackTh = nameTh || nameEn;
-      const fallbackEn = nameEn || nameTh;
-      let mappedTh: string | undefined;
-      let mappedEn: string | undefined;
-      if (provinceName && amphoeName && nameEn) {
-        const key = buildTambonKey(provinceName, amphoeName, nameEn);
-        const mapped = key ? tambonNameLookup.get(key) : undefined;
-        mappedTh = mapped?.th;
-        mappedEn = mapped?.en;
-      }
-      const finalTh = mappedTh || fallbackTh;
-      const finalEn = mappedEn || fallbackEn;
-      return language === 'TH'
-        ? formatDualDisplay(finalTh, finalEn)
-        : formatDualDisplay(finalEn, finalTh);
+    const nameTh = getTambonNameTh(properties);
+    const nameEn = getTambonNameEn(properties);
+    const fallbackTh = nameTh || nameEn;
+    const fallbackEn = nameEn || nameTh;
+    let mappedTh: string | undefined;
+    let mappedEn: string | undefined;
+    if (provinceName && amphoeName && nameEn) {
+      const key = buildTambonKey(provinceName, amphoeName, nameEn);
+      const mapped = key ? tambonNameLookup.get(key) : undefined;
+      mappedTh = mapped?.th;
+      mappedEn = mapped?.en;
+    }
+    const finalTh = mappedTh || fallbackTh;
+    const finalEn = mappedEn || fallbackEn;
+    return language === 'TH'
+      ? formatDualDisplay(finalTh, finalEn)
+      : formatDualDisplay(finalEn, finalTh);
   };
 
   const getRegionLabel = (regionKey: string): string => {
-      if (language === 'TH') {
-        return REGION_CONFIG[regionKey]?.name || regionKey;
-      }
-      return REGION_LABELS_EN[regionKey] || REGION_CONFIG[regionKey]?.name || regionKey;
+    if (language === 'TH') {
+      return REGION_CONFIG[regionKey]?.name || regionKey;
+    }
+    return REGION_LABELS_EN[regionKey] || REGION_CONFIG[regionKey]?.name || regionKey;
   };
 
   const getProvinceNameFromFeature = (properties: GeoJSONProperties): string => {
-      if (isValidName(properties.NAME_1)) return properties.NAME_1;
-      if (isValidName(properties.NL_NAME_1)) return properties.NL_NAME_1;
-      if (properties.province_th) return properties.province_th;
-      if (properties.pro_th) return properties.pro_th;
-      if (properties.PROV_NAM_T) return properties.PROV_NAM_T;
-      return "";
+    if (isValidName(properties.NAME_1)) return properties.NAME_1;
+    if (isValidName(properties.NL_NAME_1)) return properties.NL_NAME_1;
+    if (properties.province_th) return properties.province_th;
+    if (properties.pro_th) return properties.pro_th;
+    if (properties.PROV_NAM_T) return properties.PROV_NAM_T;
+    return "";
   };
 
   const getAmphoeNameFromTambon = (properties: GeoJSONProperties): string => {
-      if (isValidName(properties.NL_NAME_2)) return properties.NL_NAME_2;
-      if (isValidName(properties.NAME_2)) return properties.NAME_2;
-      if (properties.ap_th) return properties.ap_th;
-      if (properties.AMP_NAM_T) return properties.AMP_NAM_T;
-      return "";
+    if (isValidName(properties.NL_NAME_2)) return properties.NL_NAME_2;
+    if (isValidName(properties.NAME_2)) return properties.NAME_2;
+    if (properties.ap_th) return properties.ap_th;
+    if (properties.AMP_NAM_T) return properties.AMP_NAM_T;
+    return "";
   };
 
   const tambonMapAvailable = useMemo(() => {
@@ -1337,7 +1337,7 @@ const tambonNameLookup = useMemo(() => {
   // 3. Main D3 Render Logic
   useEffect(() => {
     if (!d3Loaded || !svgRef.current) return;
-    
+
     if (viewState === 'COUNTRY' && !provinceData) return;
     if (viewState === 'PROVINCE' && !selectedProvince) return;
     if (viewState === 'AMPHOE' && (!selectedProvince || !selectedAmphoe)) return;
@@ -1359,22 +1359,22 @@ const tambonNameLookup = useMemo(() => {
 
     if (viewState === 'COUNTRY') {
       if (provinceData) featuresToRender = provinceData.features;
-      
+
       // Use fitExtent to maximize map size within the viewbox
       projection = d3.geoMercator().fitExtent(
-          [[20, 20], [width - 20, height - 20]], 
-          provinceData
+        [[20, 20], [width - 20, height - 20]],
+        provinceData
       );
 
       getFillColor = (d: GeoJSONFeature) => {
-         const pName = getThaiName(d.properties);
-         return REGION_CONFIG[getRegionByProvince(pName)].color;
+        const pName = getThaiName(d.properties);
+        return REGION_CONFIG[getRegionByProvince(pName)].color;
       };
       getDisplayName = (d: GeoJSONFeature) => getProvinceDisplayName(d.properties);
       getSelectionName = (d: GeoJSONFeature) => getThaiName(d.properties);
 
     } else if (viewState === 'PROVINCE') {
-      if (!amphoeData || !selectedProvince) return; 
+      if (!amphoeData || !selectedProvince) return;
 
       const provinceKeys = buildNormalizedSet(
         [
@@ -1385,28 +1385,28 @@ const tambonNameLookup = useMemo(() => {
         normalizeProvinceKey
       );
       featuresToRender = amphoeData.features.filter((f) => {
-         const featureKeys = buildNormalizedSet(
-           [
-             getProvinceNameFromFeature(f.properties),
-             getProvinceNameEn(f.properties),
-             getProvinceNameTh(f.properties)
-           ],
-           normalizeProvinceKey
-         );
-         return setsOverlap(provinceKeys, featureKeys);
+        const featureKeys = buildNormalizedSet(
+          [
+            getProvinceNameFromFeature(f.properties),
+            getProvinceNameEn(f.properties),
+            getProvinceNameTh(f.properties)
+          ],
+          normalizeProvinceKey
+        );
+        return setsOverlap(provinceKeys, featureKeys);
       });
 
       if (featuresToRender.length === 0) {
-          console.warn("No amphoes found for", targetProvinceName);
+        console.warn("No amphoes found for", selectedProvince.name);
       }
 
       if (featuresToRender.length > 0) {
         projection = d3.geoMercator().fitExtent(
-            [[20, 20], [width - 20, height - 20]], 
-            { type: "FeatureCollection", features: featuresToRender }
+          [[20, 20], [width - 20, height - 20]],
+          { type: "FeatureCollection", features: featuresToRender }
         );
       } else {
-        projection = d3.geoMercator().center([100.5, 13.5]).scale(2500).translate([width/2, height/2]);
+        projection = d3.geoMercator().center([100.5, 13.5]).scale(2500).translate([width / 2, height / 2]);
       }
 
       const regionColor = REGION_CONFIG[selectedProvince.region].color;
@@ -1437,38 +1437,38 @@ const tambonNameLookup = useMemo(() => {
         normalizeAdminKey
       );
       featuresToRender = tambonData.features.filter((f) => {
-         const provinceName = getProvinceNameFromFeature(f.properties);
-         const amphoeName = getAmphoeNameFromTambon(f.properties);
-         const provinceKeySet = buildNormalizedSet(
-           [
-             provinceName,
-             getProvinceNameEn(f.properties),
-             getProvinceNameTh(f.properties)
-           ],
-           normalizeProvinceKey
-         );
-         const amphoeKeySet = buildNormalizedSet(
-           [
-             amphoeName,
-             getAmphoeNameTh(f.properties),
-             getAmphoeNameEn(f.properties)
-           ],
-           normalizeAdminKey
-         );
-         return setsOverlap(provinceKeys, provinceKeySet) && setsOverlap(amphoeKeys, amphoeKeySet);
+        const provinceName = getProvinceNameFromFeature(f.properties);
+        const amphoeName = getAmphoeNameFromTambon(f.properties);
+        const provinceKeySet = buildNormalizedSet(
+          [
+            provinceName,
+            getProvinceNameEn(f.properties),
+            getProvinceNameTh(f.properties)
+          ],
+          normalizeProvinceKey
+        );
+        const amphoeKeySet = buildNormalizedSet(
+          [
+            amphoeName,
+            getAmphoeNameTh(f.properties),
+            getAmphoeNameEn(f.properties)
+          ],
+          normalizeAdminKey
+        );
+        return setsOverlap(provinceKeys, provinceKeySet) && setsOverlap(amphoeKeys, amphoeKeySet);
       });
 
       if (featuresToRender.length === 0) {
-          console.warn("No tambons found for", selectedAmphoe.name);
+        console.warn("No tambons found for", selectedAmphoe.name);
       }
 
       if (featuresToRender.length > 0) {
         projection = d3.geoMercator().fitExtent(
-            [[20, 20], [width - 20, height - 20]], 
-            { type: "FeatureCollection", features: featuresToRender }
+          [[20, 20], [width - 20, height - 20]],
+          { type: "FeatureCollection", features: featuresToRender }
         );
       } else {
-        projection = d3.geoMercator().center([100.5, 13.5]).scale(2500).translate([width/2, height/2]);
+        projection = d3.geoMercator().center([100.5, 13.5]).scale(2500).translate([width / 2, height / 2]);
       }
 
       const regionColor = REGION_CONFIG[selectedProvince.region].color;
@@ -1522,14 +1522,14 @@ const tambonNameLookup = useMemo(() => {
     const zoom = d3.zoom()
       .scaleExtent([1, 8]) // Zoom limit 1x to 8x
       .on("zoom", (event: any) => {
-          g.attr("transform", event.transform);
+        g.attr("transform", event.transform);
       });
 
     svg.call(zoom);
     zoomRef.current = zoom;
 
     if (featuresToRender.length > 0) {
-        gPaths.selectAll("path")
+      gPaths.selectAll("path")
         .data(featuresToRender)
         .enter()
         .append("path")
@@ -1539,153 +1539,153 @@ const tambonNameLookup = useMemo(() => {
         .attr("stroke-width", viewState === 'COUNTRY' ? 0.5 : 1.2)
         .attr("cursor", "pointer")
         .style("transition", "all 0.2s ease")
-        .on("mouseover", function(this: any, event: any, d: GeoJSONFeature) {
-            const name = getDisplayName(d);
-            setHoveredFeature(name);
-            setHoveredPosition({ x: event.clientX, y: event.clientY });
-            d3.select(this)
+        .on("mouseover", function (this: any, event: any, d: GeoJSONFeature) {
+          const name = getDisplayName(d);
+          setHoveredFeature(name);
+          setHoveredPosition({ x: event.clientX, y: event.clientY });
+          d3.select(this)
             .attr("fill", "#FACC15")
             .attr("stroke-width", 2)
             .raise();
-            bringLabelsToFront();
-            if (focusMode && !tourActive) {
-                gPaths.selectAll("path").attr("opacity", 0.3);
-                d3.select(this).attr("opacity", 1);
-            }
+          bringLabelsToFront();
+          if (focusMode && !tourActive) {
+            gPaths.selectAll("path").attr("opacity", 0.3);
+            d3.select(this).attr("opacity", 1);
+          }
         })
-        .on("mousemove", function(this: any, event: any) {
-            setHoveredPosition({ x: event.clientX, y: event.clientY });
+        .on("mousemove", function (this: any, event: any) {
+          setHoveredPosition({ x: event.clientX, y: event.clientY });
         })
-        .on("mouseout", function(this: any, event: any, d: GeoJSONFeature, i: number) {
-            setHoveredFeature(null);
-            setHoveredPosition(null);
-            const baseFill =
-              baseFillMap.get(d) ?? getFillColor(d, featuresToRender.indexOf(d));
-            if (viewState === 'AMPHOE') {
-                const isSelected = d3.select(this).classed("is-selected");
-                d3.select(this).attr("fill", isSelected ? "#DC2626" : baseFill);
-            } else {
-                d3.select(this).attr("fill", baseFill);
-            }
-            if (focusMode && !tourActive) {
-                applyBaseOpacity();
-            }
+        .on("mouseout", function (this: any, event: any, d: GeoJSONFeature, i: number) {
+          setHoveredFeature(null);
+          setHoveredPosition(null);
+          const baseFill =
+            baseFillMap.get(d) ?? getFillColor(d, featuresToRender.indexOf(d));
+          if (viewState === 'AMPHOE') {
+            const isSelected = d3.select(this).classed("is-selected");
+            d3.select(this).attr("fill", isSelected ? "#DC2626" : baseFill);
+          } else {
+            d3.select(this).attr("fill", baseFill);
+          }
+          if (focusMode && !tourActive) {
+            applyBaseOpacity();
+          }
         })
-        .on("click", async function(this: any, event: any, d: GeoJSONFeature) {
-            const name = getSelectionName(d);
-            stopTour();
-            
-            if (viewState === 'COUNTRY') {
-                const region = getRegionByProvince(name);
-                const provData: SelectedProvince = { name, region, properties: d.properties };
-                
-                setSelectedProvince(provData);
-                await loadAmphoeData(); 
-                
-                setViewState('PROVINCE');
-                setSelectedAmphoe(null);
-                setSelectedAmphoeAreaKm2(null);
-                setSelectedTambon(null);
-                setSelectedTambonPostcodes([]);
-                setErrorPostcodes(null);
+        .on("click", async function (this: any, event: any, d: GeoJSONFeature) {
+          const name = getSelectionName(d);
+          stopTour();
 
-            } else if (viewState === 'PROVINCE') {
-                setSelectedAmphoe({
-                    name: name,
-                    properties: d.properties
-                });
-                setSelectedAmphoeAreaKm2(computeFeatureAreaKm2(d));
-                setSelectedTambon(null);
-                setSelectedTambonPostcodes([]);
-                setSelectedAmphoePostcodes([]);
-                setErrorPostcodes(null);
-                
-                await loadTambonData();
-                setViewState('AMPHOE');
-                void loadPostcodeData();
-            } else {
-                setSelectedTambon({
-                    name: name,
-                    properties: d.properties
-                });
+          if (viewState === 'COUNTRY') {
+            const region = getRegionByProvince(name);
+            const provData: SelectedProvince = { name, region, properties: d.properties };
 
-                void loadPostcodeData();
-                gPaths.selectAll("path")
-                  .classed("is-selected", false)
-                  .attr("fill", (feat: GeoJSONFeature, idx: number) => getBaseFill(feat, idx));
-                d3.select(this).classed("is-selected", true).attr("fill", "#DC2626").raise();
-            }
+            setSelectedProvince(provData);
+            await loadAmphoeData();
+
+            setViewState('PROVINCE');
+            setSelectedAmphoe(null);
+            setSelectedAmphoeAreaKm2(null);
+            setSelectedTambon(null);
+            setSelectedTambonPostcodes([]);
+            setErrorPostcodes(null);
+
+          } else if (viewState === 'PROVINCE') {
+            setSelectedAmphoe({
+              name: name,
+              properties: d.properties
+            });
+            setSelectedAmphoeAreaKm2(computeFeatureAreaKm2(d));
+            setSelectedTambon(null);
+            setSelectedTambonPostcodes([]);
+            setSelectedAmphoePostcodes([]);
+            setErrorPostcodes(null);
+
+            await loadTambonData();
+            setViewState('AMPHOE');
+            void loadPostcodeData();
+          } else {
+            setSelectedTambon({
+              name: name,
+              properties: d.properties
+            });
+
+            void loadPostcodeData();
+            gPaths.selectAll("path")
+              .classed("is-selected", false)
+              .attr("fill", (feat: GeoJSONFeature, idx: number) => getBaseFill(feat, idx));
+            d3.select(this).classed("is-selected", true).attr("fill", "#DC2626").raise();
+          }
         });
 
-        if (showLabels) {
-            gLabels.selectAll("text")
-            .data(featuresToRender)
-            .enter()
-            .append("text")
-            .attr("transform", function(d: GeoJSONFeature) {
-                const centroid = pathGenerator.centroid(d);
-                if (isNaN(centroid[0])) return "translate(-100,-100)";
-                return "translate(" + centroid[0] + "," + centroid[1] + ")";
-            })
-            .attr("dy", ".35em")
-            .text((d: GeoJSONFeature) => getDisplayName(d))
-            .attr("text-anchor", "middle")
-            .attr("font-size", viewState === 'PROVINCE' ? "10px" : "8px") 
-            .attr("font-weight", viewState === 'COUNTRY' ? "bold" : "normal")
-            .attr("fill", "#1F2937")
-            .attr("pointer-events", "none")
-            .style("text-shadow", "2px 0 #fff, -2px 0 #fff, 0 2px #fff, 0 -2px #fff")
-            .style("opacity", 0.9);
-        }
-        bringLabelsToFront();
+      if (showLabels) {
+        gLabels.selectAll("text")
+          .data(featuresToRender)
+          .enter()
+          .append("text")
+          .attr("transform", function (d: GeoJSONFeature) {
+            const centroid = pathGenerator.centroid(d);
+            if (isNaN(centroid[0])) return "translate(-100,-100)";
+            return "translate(" + centroid[0] + "," + centroid[1] + ")";
+          })
+          .attr("dy", ".35em")
+          .text((d: GeoJSONFeature) => getDisplayName(d))
+          .attr("text-anchor", "middle")
+          .attr("font-size", viewState === 'PROVINCE' ? "10px" : "8px")
+          .attr("font-weight", viewState === 'COUNTRY' ? "bold" : "normal")
+          .attr("fill", "#1F2937")
+          .attr("pointer-events", "none")
+          .style("text-shadow", "2px 0 #fff, -2px 0 #fff, 0 2px #fff, 0 -2px #fff")
+          .style("opacity", 0.9);
+      }
+      bringLabelsToFront();
 
-        if (viewState === 'AMPHOE' && selectedTambon) {
-            const targetKey = normalizeAdminKey(selectedTambon.name);
-            gPaths.selectAll("path")
-              .classed("is-selected", (feature: GeoJSONFeature) =>
-                matchNormalizedKey(getThaiName(feature.properties), targetKey, normalizeAdminKey)
-              )
-              .attr("fill", (feature: GeoJSONFeature, index: number) => {
-                const isSelected = matchNormalizedKey(getThaiName(feature.properties), targetKey, normalizeAdminKey);
-                if (isSelected) return "#DC2626";
-                return baseFillMap.get(feature) ?? getFillColor(feature, index);
-              });
-            gPaths.selectAll("path")
-              .filter((feature: GeoJSONFeature) =>
-                matchNormalizedKey(getThaiName(feature.properties), targetKey, normalizeAdminKey)
-              )
-              .raise();
-        }
+      if (viewState === 'AMPHOE' && selectedTambon) {
+        const targetKey = normalizeAdminKey(selectedTambon.name);
+        gPaths.selectAll("path")
+          .classed("is-selected", (feature: GeoJSONFeature) =>
+            matchNormalizedKey(getThaiName(feature.properties), targetKey, normalizeAdminKey)
+          )
+          .attr("fill", (feature: GeoJSONFeature, index: number) => {
+            const isSelected = matchNormalizedKey(getThaiName(feature.properties), targetKey, normalizeAdminKey);
+            if (isSelected) return "#DC2626";
+            return baseFillMap.get(feature) ?? getFillColor(feature, index);
+          });
+        gPaths.selectAll("path")
+          .filter((feature: GeoJSONFeature) =>
+            matchNormalizedKey(getThaiName(feature.properties), targetKey, normalizeAdminKey)
+          )
+          .raise();
+      }
 
-        applyBaseOpacity();
+      applyBaseOpacity();
     }
 
   }, [d3Loaded, provinceData, amphoeData, tambonData, viewState, selectedProvince, selectedAmphoe, selectedTambon, showLabels, mapLayer, focusMode, tourActive, tourRegionKey, language, provinceNameLookup, tambonNameLookup]);
 
   const handleBackToCountry = () => {
-      stopTour();
-      setViewState('COUNTRY');
-      setSelectedAmphoe(null);
-      setSelectedAmphoeAreaKm2(null);
-      setSelectedTambon(null);
-      setSelectedTambonPostcodes([]);
-      setSelectedAmphoePostcodes([]);
-      setSelectedProvince(null);
-      setSelectedAmphoeAreaKm2(null);
-      setErrorAmphoe(null);
-      setErrorTambon(null);
-      setErrorPostcodes(null);
+    stopTour();
+    setViewState('COUNTRY');
+    setSelectedAmphoe(null);
+    setSelectedAmphoeAreaKm2(null);
+    setSelectedTambon(null);
+    setSelectedTambonPostcodes([]);
+    setSelectedAmphoePostcodes([]);
+    setSelectedProvince(null);
+    setSelectedAmphoeAreaKm2(null);
+    setErrorAmphoe(null);
+    setErrorTambon(null);
+    setErrorPostcodes(null);
   };
 
   const handleBackToProvince = () => {
-      stopTour();
-      setViewState('PROVINCE');
-      setSelectedTambon(null);
-      setSelectedTambonPostcodes([]);
-      setSelectedAmphoePostcodes([]);
-      setSelectedAmphoeAreaKm2(null);
-      setErrorTambon(null);
-      setErrorPostcodes(null);
+    stopTour();
+    setViewState('PROVINCE');
+    setSelectedTambon(null);
+    setSelectedTambonPostcodes([]);
+    setSelectedAmphoePostcodes([]);
+    setSelectedAmphoeAreaKm2(null);
+    setErrorTambon(null);
+    setErrorPostcodes(null);
   };
 
   const handleZoom = (factor: number) => {
@@ -1768,29 +1768,29 @@ const tambonNameLookup = useMemo(() => {
 
     // 1. Filter features for this region
     const regionFeatures = provinceData.features.filter(f => {
-        const pName = getThaiName(f.properties);
-        return getRegionByProvince(pName) === regionKey;
+      const pName = getThaiName(f.properties);
+      return getRegionByProvince(pName) === regionKey;
     });
 
     if (regionFeatures.length === 0) return;
 
     // 2. Re-calculate projection to get bounds (must match initial render)
     const projection = d3.geoMercator().fitExtent(
-        [[20, 20], [width - 20, height - 20]], 
-        provinceData
+      [[20, 20], [width - 20, height - 20]],
+      provinceData
     );
     const pathGenerator = d3.geoPath().projection(projection);
 
     // 3. Calculate bounds of the region
     const bounds = pathGenerator.bounds({ type: "FeatureCollection", features: regionFeatures });
     const [[x0, y0], [x1, y1]] = bounds;
-    
+
     // 4. Calculate transform
     const dx = x1 - x0;
     const dy = y1 - y0;
     const x = (x0 + x1) / 2;
     const y = (y0 + y1) / 2;
-    
+
     const scale = Math.max(1, Math.min(8, 0.9 / Math.max(dx / width, dy / height)));
     const translate = [width / 2 - scale * x, height / 2 - scale * y];
 
@@ -1820,10 +1820,10 @@ const tambonNameLookup = useMemo(() => {
   const selectedAmphoeLabel = selectedAmphoe ? getAmphoeDisplayName(selectedAmphoe.properties) : "";
   const selectedTambonLabel = selectedTambon
     ? getTambonDisplayName(
-        selectedTambon.properties,
-        getProvinceNameEn(selectedTambon.properties),
-        getAmphoeNameEn(selectedTambon.properties)
-      )
+      selectedTambon.properties,
+      getProvinceNameEn(selectedTambon.properties),
+      getAmphoeNameEn(selectedTambon.properties)
+    )
     : "";
   const showTambonMap = viewState !== 'AMPHOE' || tambonMapAvailable;
   const selectedTambonKey = selectedTambon ? normalizeAdminKey(selectedTambon.name) : "";
@@ -1832,11 +1832,11 @@ const tambonNameLookup = useMemo(() => {
 
   return (
     <div className="min-h-screen bg-stone-50 font-sans text-stone-800 relative overflow-hidden">
-      
+
       {/* --- Map Area --- */}
       <div className="absolute inset-0 flex items-center justify-center bg-blue-50 overflow-hidden transition-colors duration-500"
-           style={{ backgroundColor: viewState === 'COUNTRY' ? '#eff6ff' : '#f0f9ff' }}>
-        
+        style={{ backgroundColor: viewState === 'COUNTRY' ? '#eff6ff' : '#f0f9ff' }}>
+
         <div className="absolute inset-0 z-0 bg-grid-slate-200 [mask-image:linear-gradient(0deg,white,rgba(255,255,255,0.6))]"></div>
 
         {/* Loading / Error States */}
@@ -1844,283 +1844,274 @@ const tambonNameLookup = useMemo(() => {
           <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-white/50 backdrop-blur-sm">
             <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 mb-4"></div>
             <p className="text-xl font-bold text-blue-800">
-                {loading
-                  ? t.loadingCountry
-                  : loadingAmphoe
-                    ? t.loadingAmphoe
-                    : t.loadingTambon}
+              {loading
+                ? t.loadingCountry
+                : loadingAmphoe
+                  ? t.loadingAmphoe
+                  : t.loadingTambon}
             </p>
           </div>
         )}
 
         {(errorAmphoe || errorTambon) && (
-            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 bg-red-50 p-6 rounded-xl border border-red-200 shadow-xl text-center max-w-sm">
-                <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-3" />
-                <h3 className="text-lg font-bold text-red-700 mb-2">{t.errorTitle}</h3>
-                <p className="text-red-600 mb-4">{errorTambon || errorAmphoe}</p>
-                <button 
-                    onClick={handleBackToCountry}
-                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
-                >
-                    {t.errorBackHome}
-                </button>
-            </div>
+          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 bg-red-50 p-6 rounded-xl border border-red-200 shadow-xl text-center max-w-sm">
+            <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-3" />
+            <h3 className="text-lg font-bold text-red-700 mb-2">{t.errorTitle}</h3>
+            <p className="text-red-600 mb-4">{errorTambon || errorAmphoe}</p>
+            <button
+              onClick={handleBackToCountry}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
+            >
+              {t.errorBackHome}
+            </button>
+          </div>
         )}
 
         {/* Map Container */}
         <div className="z-10 relative w-full h-full flex flex-col items-center justify-center">
-            
-            {/* Header / Back Button */}
-            <div className="absolute top-4 left-4 z-20 flex flex-col gap-3 w-72 max-w-[calc(100vw-2rem)]">
-                {viewState === 'AMPHOE' ? (
-                    <button 
-                        onClick={handleBackToProvince}
-                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-lg transition-all transform hover:scale-105 font-bold"
-                    >
-                        <ChevronLeft className="w-5 h-5" /> {t.backToAmphoe}
-                    </button>
-                ) : viewState === 'PROVINCE' ? (
-                    <button 
-                        onClick={handleBackToCountry}
-                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-lg transition-all transform hover:scale-105 font-bold"
-                    >
-                        <ChevronLeft className="w-5 h-5" /> {t.backToCountry}
-                    </button>
-                ) : (
-                    <div className="bg-white/80 backdrop-blur-md px-4 py-2 rounded-xl shadow-lg border border-white/50">
-                        <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                            <Compass className="w-6 h-6 text-blue-600" /> {t.mapTitle}
-                        </h2>
-                        <p className="text-xs text-slate-500 mt-1">{t.mapSubtitle}</p>
-                    </div>
-                )}
 
-                <div className="bg-white/90 backdrop-blur-md px-3 py-3 rounded-xl shadow-lg border border-white/50 space-y-2">
-                  <div className="flex flex-wrap gap-2">
-                    <button 
-                      onClick={() => setShowLabels(!showLabels)}
-                      className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold shadow-sm transition-all border ${
-                        showLabels ? "bg-slate-900 text-white border-slate-900" : "bg-white hover:bg-slate-50 text-slate-700 border-slate-200"
-                      }`}
-                    >
-                      <Type className="w-4 h-4" /> 
-                      {showLabels ? t.toggleLabelsHide : t.toggleLabelsShow}
-                    </button>
-                    <button 
-                      onClick={() => setFocusMode(!focusMode)}
-                      className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold shadow-sm transition-all border ${
-                        focusMode ? "bg-emerald-600 text-white border-emerald-600" : "bg-white hover:bg-slate-50 text-slate-700 border-slate-200"
-                      }`}
-                    >
-                      <Sparkles className="w-4 h-4" /> {t.focusMode}
-                    </button>
-                    <button 
-                      onClick={handleCopyLink}
-                      className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold shadow-sm transition-all border ${
-                        copiedLink ? "bg-blue-600 text-white border-blue-600" : "bg-white hover:bg-slate-50 text-slate-700 border-slate-200"
-                      }`}
-                    >
-                      <Share2 className="w-4 h-4" /> {copiedLink ? t.linkCopied : t.shareLink}
-                    </button>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Layers className="w-4 h-4 text-slate-400" />
-                    <div className="flex items-center gap-1 bg-slate-100 rounded-full p-1">
-                      <button
-                        onClick={() => setMapLayer('REGION')}
-                        className={`px-3 py-1 rounded-full text-[11px] font-semibold transition ${
-                          mapLayer === 'REGION' ? "bg-white text-slate-800 shadow" : "text-slate-500 hover:text-slate-700"
-                        }`}
-                      >
-                        {t.layerRegion}
-                      </button>
-                      <button
-                        onClick={() => setMapLayer('AREA')}
-                        className={`px-3 py-1 rounded-full text-[11px] font-semibold transition ${
-                          mapLayer === 'AREA' ? "bg-white text-slate-800 shadow" : "text-slate-500 hover:text-slate-700"
-                        }`}
-                      >
-                        {t.layerArea}
-                      </button>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Languages className="w-4 h-4 text-slate-400" />
-                    <div className="flex items-center gap-1 bg-slate-100 rounded-full p-1">
-                      <button
-                        onClick={() => setLanguage('TH')}
-                        className={`px-3 py-1 rounded-full text-[11px] font-semibold transition ${
-                          language === 'TH' ? "bg-white text-slate-800 shadow" : "text-slate-500 hover:text-slate-700"
-                        }`}
-                      >
-                        ไทย
-                      </button>
-                      <button
-                        onClick={() => setLanguage('EN')}
-                        className={`px-3 py-1 rounded-full text-[11px] font-semibold transition ${
-                          language === 'EN' ? "bg-white text-slate-800 shadow" : "text-slate-500 hover:text-slate-700"
-                        }`}
-                      >
-                        English
-                      </button>
-                    </div>
-                  </div>
-                </div>
+          {/* Header / Back Button */}
+          <div className="absolute top-4 left-4 z-20 flex flex-col gap-3 w-72 max-w-[calc(100vw-2rem)]">
+            {viewState === 'AMPHOE' ? (
+              <button
+                onClick={handleBackToProvince}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-lg transition-all transform hover:scale-105 font-bold"
+              >
+                <ChevronLeft className="w-5 h-5" /> {t.backToAmphoe}
+              </button>
+            ) : viewState === 'PROVINCE' ? (
+              <button
+                onClick={handleBackToCountry}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-lg transition-all transform hover:scale-105 font-bold"
+              >
+                <ChevronLeft className="w-5 h-5" /> {t.backToCountry}
+              </button>
+            ) : (
+              <div className="bg-white/80 backdrop-blur-md px-4 py-2 rounded-xl shadow-lg border border-white/50">
+                <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                  <Compass className="w-6 h-6 text-blue-600" /> {t.mapTitle}
+                </h2>
+                <p className="text-xs text-slate-500 mt-1">{t.mapSubtitle}</p>
+              </div>
+            )}
 
-                <div className="bg-white/90 backdrop-blur-md px-3 py-3 rounded-xl shadow-lg border border-white/50">
-                  <div className="flex items-center gap-2">
-                    <Search className="w-4 h-4 text-slate-500" />
-                    <input
-                      value={searchTerm}
-                      onChange={(event) => setSearchTerm(event.target.value)}
-                      placeholder={t.searchPlaceholder}
-                      className="flex-1 bg-transparent text-sm text-slate-700 placeholder:text-slate-400 outline-none"
-                    />
-                    {searchTerm && (
-                      <button
-                        onClick={() => setSearchTerm("")}
-                        className="p-1 rounded-full hover:bg-slate-100 text-slate-500"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    )}
-                  </div>
-                  {searchTerm && (
-                    <div className="mt-2 max-h-64 overflow-auto space-y-1">
-                      {loadingPostcodes && !postcodeData && (
-                        <p className="text-xs text-slate-500 px-2 py-1.5">{t.searchLoading}</p>
-                      )}
-                      {searchResults.length === 0 && !loadingPostcodes && (
-                        <p className="text-xs text-slate-500 px-2 py-1.5">{t.searchNoResults}</p>
-                      )}
-                      {searchResults.map((result) => (
-                        <button
-                          key={result.id}
-                          onMouseDown={(event) => event.preventDefault()}
-                          onClick={() => handleSearchSelect(result)}
-                          className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-slate-50 transition"
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-sm font-semibold text-slate-700">{result.label}</span>
-                            <span
-                              className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
-                                result.type === 'province'
-                                  ? "bg-emerald-100 text-emerald-700"
-                                  : result.type === 'amphoe'
-                                    ? "bg-blue-100 text-blue-700"
-                                    : "bg-amber-100 text-amber-700"
-                              }`}
-                            >
-                              {result.type === 'province' ? t.typeProvince : result.type === 'amphoe' ? t.typeAmphoe : t.typeTambon}
-                            </span>
-                          </div>
-                          {result.sublabel && (
-                            <p className="text-[11px] text-slate-500 mt-0.5">{result.sublabel}</p>
-                          )}
-                        </button>
-                      ))}
-                    </div>
-                  )}
+            <div className="bg-white/90 backdrop-blur-md px-3 py-3 rounded-xl shadow-lg border border-white/50 space-y-2">
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => setShowLabels(!showLabels)}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold shadow-sm transition-all border ${showLabels ? "bg-slate-900 text-white border-slate-900" : "bg-white hover:bg-slate-50 text-slate-700 border-slate-200"
+                    }`}
+                >
+                  <Type className="w-4 h-4" />
+                  {showLabels ? t.toggleLabelsHide : t.toggleLabelsShow}
+                </button>
+                <button
+                  onClick={() => setFocusMode(!focusMode)}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold shadow-sm transition-all border ${focusMode ? "bg-emerald-600 text-white border-emerald-600" : "bg-white hover:bg-slate-50 text-slate-700 border-slate-200"
+                    }`}
+                >
+                  <Sparkles className="w-4 h-4" /> {t.focusMode}
+                </button>
+                <button
+                  onClick={handleCopyLink}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold shadow-sm transition-all border ${copiedLink ? "bg-blue-600 text-white border-blue-600" : "bg-white hover:bg-slate-50 text-slate-700 border-slate-200"
+                    }`}
+                >
+                  <Share2 className="w-4 h-4" /> {copiedLink ? t.linkCopied : t.shareLink}
+                </button>
+              </div>
+              <div className="flex items-center gap-2">
+                <Layers className="w-4 h-4 text-slate-400" />
+                <div className="flex items-center gap-1 bg-slate-100 rounded-full p-1">
+                  <button
+                    onClick={() => setMapLayer('REGION')}
+                    className={`px-3 py-1 rounded-full text-[11px] font-semibold transition ${mapLayer === 'REGION' ? "bg-white text-slate-800 shadow" : "text-slate-500 hover:text-slate-700"
+                      }`}
+                  >
+                    {t.layerRegion}
+                  </button>
+                  <button
+                    onClick={() => setMapLayer('AREA')}
+                    className={`px-3 py-1 rounded-full text-[11px] font-semibold transition ${mapLayer === 'AREA' ? "bg-white text-slate-800 shadow" : "text-slate-500 hover:text-slate-700"
+                      }`}
+                  >
+                    {t.layerArea}
+                  </button>
                 </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Languages className="w-4 h-4 text-slate-400" />
+                <div className="flex items-center gap-1 bg-slate-100 rounded-full p-1">
+                  <button
+                    onClick={() => setLanguage('TH')}
+                    className={`px-3 py-1 rounded-full text-[11px] font-semibold transition ${language === 'TH' ? "bg-white text-slate-800 shadow" : "text-slate-500 hover:text-slate-700"
+                      }`}
+                  >
+                    ไทย
+                  </button>
+                  <button
+                    onClick={() => setLanguage('EN')}
+                    className={`px-3 py-1 rounded-full text-[11px] font-semibold transition ${language === 'EN' ? "bg-white text-slate-800 shadow" : "text-slate-500 hover:text-slate-700"
+                      }`}
+                  >
+                    English
+                  </button>
+                </div>
+              </div>
             </div>
 
-            {viewState === 'AMPHOE' && !tambonMapAvailable && (
-              <div className="absolute inset-0 z-20 flex items-center justify-center">
-                <div className="bg-white/90 backdrop-blur-md px-5 py-4 rounded-2xl shadow-lg border border-white/60 text-center max-w-xs">
-                  <p className="text-sm font-semibold text-slate-700">{t.tambonMapUnavailableTitle}</p>
-                  <p className="text-xs text-slate-500 mt-1">{t.tambonMapUnavailableHint}</p>
-                </div>
-              </div>
-            )}
-
-            {/* Zoom Controls */}
-            {showTambonMap && (
-              <div className="absolute bottom-8 right-8 flex flex-col gap-2 z-20">
-                  <button 
-                      onClick={() => handleZoom(1.3)}
-                      className="p-3 bg-white hover:bg-slate-50 text-slate-700 rounded-full shadow-lg border border-slate-200 transition-transform active:scale-95"
+            <div className="bg-white/90 backdrop-blur-md px-3 py-3 rounded-xl shadow-lg border border-white/50">
+              <div className="flex items-center gap-2">
+                <Search className="w-4 h-4 text-slate-500" />
+                <input
+                  value={searchTerm}
+                  onChange={(event) => setSearchTerm(event.target.value)}
+                  placeholder={t.searchPlaceholder}
+                  className="flex-1 bg-transparent text-sm text-slate-700 placeholder:text-slate-400 outline-none"
+                />
+                {searchTerm && (
+                  <button
+                    onClick={() => setSearchTerm("")}
+                    className="p-1 rounded-full hover:bg-slate-100 text-slate-500"
                   >
-                      <Plus className="w-6 h-6" />
+                    <X className="w-3 h-3" />
                   </button>
-                  <button 
-                      onClick={() => handleZoom(0.7)}
-                      className="p-3 bg-white hover:bg-slate-50 text-slate-700 rounded-full shadow-lg border border-slate-200 transition-transform active:scale-95"
-                  >
-                      <Minus className="w-6 h-6" />
-                  </button>
+                )}
               </div>
-            )}
-
-            {/* Legend */}
-            {viewState === 'COUNTRY' && (
-                <div className="absolute bottom-8 left-8 bg-white/90 backdrop-blur-sm p-4 rounded-xl shadow-lg border border-slate-100 z-20 hidden md:block">
-                    <h3 className="text-sm font-bold text-slate-700 mb-3">{t.legendTitle}</h3>
-                    <div className="space-y-2">
-                        {Object.entries(REGION_CONFIG).map(([key, config]) => (
-                            <div 
-                                key={key} 
-                                className="flex items-center gap-2 cursor-pointer hover:bg-slate-100 p-1 rounded transition-colors"
-                                onClick={() => handleRegionClick(key)}
-                            >
-                                <span className="w-3 h-3 rounded-full shadow-sm" style={{ backgroundColor: config.color }}></span>
-                                <span className="text-xs text-slate-600">{getRegionLabel(key)}</span>
-                            </div>
-                        ))}
-                    </div>
-                    {mapLayer === 'AREA' && (
-                      <div className="mt-4">
-                        <div className="flex items-center justify-between text-[10px] text-slate-500 mb-1">
-                          <span>{t.legendSmall}</span>
-                          <span>{t.legendLarge}</span>
-                        </div>
-                        <div className="h-2 rounded-full bg-gradient-to-r from-emerald-100 via-cyan-400 to-blue-700"></div>
-                      </div>
-                    )}
-                    <div className="mt-4 pt-4 border-t border-slate-200">
-                      <button
-                        onClick={handleToggleTour}
-                        className={`w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold transition ${
-                          tourActive ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                        }`}
-                      >
-                        {tourActive ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-                        {tourActive ? t.tourStop : t.tourStart}
-                      </button>
-                      {tourActive && tourRegionKey && (
-                        <div className="mt-2 flex items-center gap-2 text-[11px] text-slate-500">
-                          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                          {t.touringPrefix} {getRegionLabel(tourRegionKey)}
-                        </div>
-                      )}
-                    </div>
-                </div>
-            )}
-            
-            {/* Hover Tooltip */}
-            {hoveredFeature && hoveredPosition && (
-               <div
-                 className="fixed z-50 pointer-events-none bg-slate-900/95 text-white px-3 py-2 rounded-xl shadow-2xl border border-slate-700/60 backdrop-blur-sm"
-                 style={{ left: hoveredPosition.x + 14, top: hoveredPosition.y + 14 }}
-               >
-                  <p className="text-[10px] uppercase tracking-widest text-slate-300">{hoverTypeLabel}</p>
-                  <p className="text-sm font-bold leading-tight">{hoveredFeature}</p>
-                  {viewState === 'COUNTRY' && (
-                    <p className="text-[10px] text-slate-400 mt-0.5">
-                      {getRegionLabel(getRegionByProvince(hoveredFeature))}
-                    </p>
+              {searchTerm && (
+                <div className="mt-2 max-h-64 overflow-auto space-y-1">
+                  {loadingPostcodes && !postcodeData && (
+                    <p className="text-xs text-slate-500 px-2 py-1.5">{t.searchLoading}</p>
                   )}
-               </div>
-            )}
+                  {searchResults.length === 0 && !loadingPostcodes && (
+                    <p className="text-xs text-slate-500 px-2 py-1.5">{t.searchNoResults}</p>
+                  )}
+                  {searchResults.map((result) => (
+                    <button
+                      key={result.id}
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={() => handleSearchSelect(result)}
+                      className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-slate-50 transition"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-sm font-semibold text-slate-700">{result.label}</span>
+                        <span
+                          className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${result.type === 'province'
+                              ? "bg-emerald-100 text-emerald-700"
+                              : result.type === 'amphoe'
+                                ? "bg-blue-100 text-blue-700"
+                                : "bg-amber-100 text-amber-700"
+                            }`}
+                        >
+                          {result.type === 'province' ? t.typeProvince : result.type === 'amphoe' ? t.typeAmphoe : t.typeTambon}
+                        </span>
+                      </div>
+                      {result.sublabel && (
+                        <p className="text-[11px] text-slate-500 mt-0.5">{result.sublabel}</p>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
 
-            {/* SVG Render */}
-            {showTambonMap && (
-              <svg 
-                  ref={svgRef} 
-                  viewBox="0 0 800 1200" 
-                  className="w-full h-full transition-all duration-700 ease-in-out drop-shadow-2xl"
-                  style={{ filter: "drop-shadow(0px 15px 15px rgba(0,0,0,0.15))" }}
-              ></svg>
-            )}
+          {viewState === 'AMPHOE' && !tambonMapAvailable && (
+            <div className="absolute inset-0 z-20 flex items-center justify-center">
+              <div className="bg-white/90 backdrop-blur-md px-5 py-4 rounded-2xl shadow-lg border border-white/60 text-center max-w-xs">
+                <p className="text-sm font-semibold text-slate-700">{t.tambonMapUnavailableTitle}</p>
+                <p className="text-xs text-slate-500 mt-1">{t.tambonMapUnavailableHint}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Zoom Controls */}
+          {showTambonMap && (
+            <div className="absolute bottom-8 right-8 flex flex-col gap-2 z-20">
+              <button
+                onClick={() => handleZoom(1.3)}
+                className="p-3 bg-white hover:bg-slate-50 text-slate-700 rounded-full shadow-lg border border-slate-200 transition-transform active:scale-95"
+              >
+                <Plus className="w-6 h-6" />
+              </button>
+              <button
+                onClick={() => handleZoom(0.7)}
+                className="p-3 bg-white hover:bg-slate-50 text-slate-700 rounded-full shadow-lg border border-slate-200 transition-transform active:scale-95"
+              >
+                <Minus className="w-6 h-6" />
+              </button>
+            </div>
+          )}
+
+          {/* Legend */}
+          {viewState === 'COUNTRY' && (
+            <div className="absolute bottom-8 left-8 bg-white/90 backdrop-blur-sm p-4 rounded-xl shadow-lg border border-slate-100 z-20 hidden md:block">
+              <h3 className="text-sm font-bold text-slate-700 mb-3">{t.legendTitle}</h3>
+              <div className="space-y-2">
+                {Object.entries(REGION_CONFIG).map(([key, config]) => (
+                  <div
+                    key={key}
+                    className="flex items-center gap-2 cursor-pointer hover:bg-slate-100 p-1 rounded transition-colors"
+                    onClick={() => handleRegionClick(key)}
+                  >
+                    <span className="w-3 h-3 rounded-full shadow-sm" style={{ backgroundColor: config.color }}></span>
+                    <span className="text-xs text-slate-600">{getRegionLabel(key)}</span>
+                  </div>
+                ))}
+              </div>
+              {mapLayer === 'AREA' && (
+                <div className="mt-4">
+                  <div className="flex items-center justify-between text-[10px] text-slate-500 mb-1">
+                    <span>{t.legendSmall}</span>
+                    <span>{t.legendLarge}</span>
+                  </div>
+                  <div className="h-2 rounded-full bg-gradient-to-r from-emerald-100 via-cyan-400 to-blue-700"></div>
+                </div>
+              )}
+              <div className="mt-4 pt-4 border-t border-slate-200">
+                <button
+                  onClick={handleToggleTour}
+                  className={`w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold transition ${tourActive ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                    }`}
+                >
+                  {tourActive ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                  {tourActive ? t.tourStop : t.tourStart}
+                </button>
+                {tourActive && tourRegionKey && (
+                  <div className="mt-2 flex items-center gap-2 text-[11px] text-slate-500">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    {t.touringPrefix} {getRegionLabel(tourRegionKey)}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Hover Tooltip */}
+          {hoveredFeature && hoveredPosition && (
+            <div
+              className="fixed z-50 pointer-events-none bg-slate-900/95 text-white px-3 py-2 rounded-xl shadow-2xl border border-slate-700/60 backdrop-blur-sm"
+              style={{ left: hoveredPosition.x + 14, top: hoveredPosition.y + 14 }}
+            >
+              <p className="text-[10px] uppercase tracking-widest text-slate-300">{hoverTypeLabel}</p>
+              <p className="text-sm font-bold leading-tight">{hoveredFeature}</p>
+              {viewState === 'COUNTRY' && (
+                <p className="text-[10px] text-slate-400 mt-0.5">
+                  {getRegionLabel(getRegionByProvince(hoveredFeature))}
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* SVG Render */}
+          {showTambonMap && (
+            <svg
+              ref={svgRef}
+              viewBox="0 0 800 1200"
+              className="w-full h-full transition-all duration-700 ease-in-out drop-shadow-2xl"
+              style={{ filter: "drop-shadow(0px 15px 15px rgba(0,0,0,0.15))" }}
+            ></svg>
+          )}
         </div>
       </div>
 
@@ -2129,224 +2120,223 @@ const tambonNameLookup = useMemo(() => {
         fixed inset-y-0 right-0 w-full md:w-96 bg-white/90 backdrop-blur-md shadow-2xl transform transition-transform duration-300 z-30 overflow-y-auto
         ${(selectedProvince || selectedAmphoe) ? 'translate-x-0' : 'translate-x-full'}
       `}>
-        
+
         <div className="p-6 border-b border-slate-100 bg-white/50 sticky top-0 z-10 flex justify-between items-center">
-            <h1 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                <Info className="w-5 h-5 text-blue-500" /> 
-                {viewState === 'AMPHOE' ? t.sidebarTitleTambon : viewState === 'PROVINCE' ? t.sidebarTitleAmphoe : t.sidebarTitleProvince}
-            </h1>
-            <button onClick={handleBackToCountry} className="p-2 bg-slate-100 rounded-full hover:bg-slate-200 transition">
-                <X className="w-4 h-4" />
-            </button>
+          <h1 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+            <Info className="w-5 h-5 text-blue-500" />
+            {viewState === 'AMPHOE' ? t.sidebarTitleTambon : viewState === 'PROVINCE' ? t.sidebarTitleAmphoe : t.sidebarTitleProvince}
+          </h1>
+          <button onClick={handleBackToCountry} className="p-2 bg-slate-100 rounded-full hover:bg-slate-200 transition">
+            <X className="w-4 h-4" />
+          </button>
         </div>
 
         <div className="p-6">
           {viewState === 'COUNTRY' && !selectedProvince ? (
             <div className="flex flex-col items-center justify-center h-[70vh] text-slate-400">
-               <div className="bg-slate-100 p-6 rounded-full mb-6">
-                  <MapPin className="w-12 h-12 text-slate-300" />
-               </div>
-               <p className="text-lg font-medium text-slate-600">{t.emptyCountryTitle}</p>
-               <p className="text-sm text-slate-400 mt-2 text-center max-w-[200px]">
-                   {t.emptyCountryHint}
-               </p>
+              <div className="bg-slate-100 p-6 rounded-full mb-6">
+                <MapPin className="w-12 h-12 text-slate-300" />
+              </div>
+              <p className="text-lg font-medium text-slate-600">{t.emptyCountryTitle}</p>
+              <p className="text-sm text-slate-400 mt-2 text-center max-w-[200px]">
+                {t.emptyCountryHint}
+              </p>
             </div>
           ) : selectedProvince ? (
             <div className="space-y-6 animate-fade-in">
-                 <div className="flex items-center gap-2 text-sm text-slate-500 mb-2">
-                    <span onClick={handleBackToCountry} className="cursor-pointer hover:text-blue-600">{t.breadcrumbCountry}</span>
+              <div className="flex items-center gap-2 text-sm text-slate-500 mb-2">
+                <span onClick={handleBackToCountry} className="cursor-pointer hover:text-blue-600">{t.breadcrumbCountry}</span>
+                <span>/</span>
+                <span
+                  onClick={viewState === 'AMPHOE' ? handleBackToProvince : undefined}
+                  className={`font-bold text-slate-800 ${viewState === 'AMPHOE' ? 'cursor-pointer hover:text-blue-600' : ''}`}
+                >
+                  {selectedProvinceLabel}
+                </span>
+                {viewState === 'AMPHOE' && selectedAmphoe && (
+                  <>
                     <span>/</span>
-                    <span
-                      onClick={viewState === 'AMPHOE' ? handleBackToProvince : undefined}
-                      className={`font-bold text-slate-800 ${viewState === 'AMPHOE' ? 'cursor-pointer hover:text-blue-600' : ''}`}
-                    >
-                      {selectedProvinceLabel}
-                    </span>
-                    {viewState === 'AMPHOE' && selectedAmphoe && (
-                      <>
-                        <span>/</span>
-                        <span className="font-bold text-slate-800">{selectedAmphoeLabel}</span>
-                      </>
-                    )}
-                 </div>
+                    <span className="font-bold text-slate-800">{selectedAmphoeLabel}</span>
+                  </>
+                )}
+              </div>
 
-                 <div className="text-center pb-6 border-b border-slate-100">
-                    <span className="inline-block px-4 py-1.5 rounded-full text-xs font-bold tracking-wider uppercase text-white mb-3 shadow-sm" 
-                          style={{ backgroundColor: REGION_CONFIG[selectedProvince.region].color }}>
-                      {getRegionLabel(selectedProvince.region)}
-                    </span>
-                    <h2 className="text-4xl font-extrabold text-slate-800">{selectedProvinceLabel}</h2>
-                 </div>
+              <div className="text-center pb-6 border-b border-slate-100">
+                <span className="inline-block px-4 py-1.5 rounded-full text-xs font-bold tracking-wider uppercase text-white mb-3 shadow-sm"
+                  style={{ backgroundColor: REGION_CONFIG[selectedProvince.region].color }}>
+                  {getRegionLabel(selectedProvince.region)}
+                </span>
+                <h2 className="text-4xl font-extrabold text-slate-800">{selectedProvinceLabel}</h2>
+              </div>
 
-                 {selectedAmphoe ? (
-                     <div className="bg-blue-50 p-5 rounded-2xl border border-blue-100 animate-slide-up">
-                        <h3 className="text-xs font-bold text-blue-400 uppercase mb-3 tracking-wide flex items-center gap-2">
-                             <MapPin className="w-4 h-4" /> {t.selectedAmphoeTitle}
-                        </h3>
-                        <p className="text-2xl font-bold text-blue-900 mb-2">{selectedAmphoeLabel}</p>
-                        <div className="grid grid-cols-2 gap-3 mt-4">
-                             <div className="bg-white p-3 rounded-lg text-center shadow-sm">
-                                 <p className="text-xs text-slate-400">{t.allPostcodes}</p>
-                                 {loadingPostcodes ? (
-                                   <p className="text-xs text-slate-500 mt-2">{t.postcodesLoading}</p>
-                                 ) : errorPostcodes ? (
-                                   <p className="text-xs text-red-600 mt-2">{errorPostcodes}</p>
-                                 ) : selectedAmphoePostcodes.length > 0 ? (
-                                   <div className="mt-2 flex flex-wrap justify-center gap-1">
-                                     {amphoePostalPreview.map((code) => (
-                                       <span
-                                         key={code}
-                                         className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-semibold"
-                                       >
-                                         {code}
-                                       </span>
-                                     ))}
-                                     {amphoePostalRemaining > 0 && (
-                                       <span className="px-2 py-0.5 rounded-full bg-slate-200 text-slate-600 text-[10px] font-semibold">
-                                         +{amphoePostalRemaining}
-                                       </span>
-                                     )}
-                                   </div>
-                                 ) : (
-                                   <p className="text-xs text-slate-500 mt-2">{t.postcodesNotFound}</p>
-                                 )}
-                             </div>
-                             <div className="bg-white p-3 rounded-lg text-center shadow-sm">
-                                 <p className="text-xs text-slate-400">{t.area}</p>
-                                 <p className="font-bold text-slate-700">
-                                   {selectedAmphoeAreaKm2 != null
-                                     ? `${formatAreaKm2(selectedAmphoeAreaKm2)} km²`
-                                     : t.areaUnknown}
-                                 </p>
-                             </div>
-                       </div>
+              {selectedAmphoe ? (
+                <div className="bg-blue-50 p-5 rounded-2xl border border-blue-100 animate-slide-up">
+                  <h3 className="text-xs font-bold text-blue-400 uppercase mb-3 tracking-wide flex items-center gap-2">
+                    <MapPin className="w-4 h-4" /> {t.selectedAmphoeTitle}
+                  </h3>
+                  <p className="text-2xl font-bold text-blue-900 mb-2">{selectedAmphoeLabel}</p>
+                  <div className="grid grid-cols-2 gap-3 mt-4">
+                    <div className="bg-white p-3 rounded-lg text-center shadow-sm">
+                      <p className="text-xs text-slate-400">{t.allPostcodes}</p>
+                      {loadingPostcodes ? (
+                        <p className="text-xs text-slate-500 mt-2">{t.postcodesLoading}</p>
+                      ) : errorPostcodes ? (
+                        <p className="text-xs text-red-600 mt-2">{errorPostcodes}</p>
+                      ) : selectedAmphoePostcodes.length > 0 ? (
+                        <div className="mt-2 flex flex-wrap justify-center gap-1">
+                          {amphoePostalPreview.map((code) => (
+                            <span
+                              key={code}
+                              className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-semibold"
+                            >
+                              {code}
+                            </span>
+                          ))}
+                          {amphoePostalRemaining > 0 && (
+                            <span className="px-2 py-0.5 rounded-full bg-slate-200 text-slate-600 text-[10px] font-semibold">
+                              +{amphoePostalRemaining}
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-slate-500 mt-2">{t.postcodesNotFound}</p>
+                      )}
                     </div>
-                 ) : viewState === 'PROVINCE' ? (
-                     <div className="bg-slate-50 p-5 rounded-2xl border border-dashed border-slate-300 text-center py-8">
-                         <p className="text-slate-400 mb-2">{t.noAmphoeTitle}</p>
-                         <p className="text-sm text-slate-500">{t.noAmphoeHint}</p>
-                     </div>
-                 ) : null}
+                    <div className="bg-white p-3 rounded-lg text-center shadow-sm">
+                      <p className="text-xs text-slate-400">{t.area}</p>
+                      <p className="font-bold text-slate-700">
+                        {selectedAmphoeAreaKm2 != null
+                          ? `${formatAreaKm2(selectedAmphoeAreaKm2)} km²`
+                          : t.areaUnknown}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : viewState === 'PROVINCE' ? (
+                <div className="bg-slate-50 p-5 rounded-2xl border border-dashed border-slate-300 text-center py-8">
+                  <p className="text-slate-400 mb-2">{t.noAmphoeTitle}</p>
+                  <p className="text-sm text-slate-500">{t.noAmphoeHint}</p>
+                </div>
+              ) : null}
 
-                 {viewState === 'AMPHOE' && (
-                   !tambonMapAvailable && (
-                     <div className="bg-white/90 p-5 rounded-2xl border border-slate-100 shadow-sm">
-                        <div className="flex items-center justify-between gap-2 mb-3">
-                          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wide">
-                            {t.tambonFallbackListTitle}
-                          </h3>
-                        </div>
-                        <p className="text-xs text-slate-400 mb-3">{t.tambonFallbackListHint}</p>
-                        {loadingPostcodes ? (
-                          <p className="text-sm text-slate-500">{t.postcodesLoading}</p>
-                        ) : errorPostcodes ? (
-                          <p className="text-sm text-red-600">{errorPostcodes}</p>
-                        ) : tambonFallbackList.length > 0 ? (
-                          <div className="space-y-2 max-h-64 overflow-auto pr-1">
-                            {tambonFallbackList.map((item) => {
-                              const displayName = language === 'TH' ? item.nameTh : item.nameEn;
-                              const itemKey = normalizeAdminKey(item.nameEn || item.nameTh);
-                              const isSelected = Boolean(selectedTambonKey && itemKey === selectedTambonKey);
-                              const visibleCodes = item.postalCodes.slice(0, 5);
-                              const remaining = item.postalCodes.length - visibleCodes.length;
-                              return (
-                                <button
-                                  key={`${itemKey}-${item.nameEn}`}
-                                  onClick={() => handleTambonListSelect(item)}
-                                  className={`w-full text-left px-3 py-2 rounded-xl border transition ${
-                                    isSelected
-                                      ? "border-emerald-400 bg-emerald-50"
-                                      : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
-                                  }`}
-                                >
-                                  <div className="flex items-center justify-between gap-2">
-                                    <span className="text-sm font-semibold text-slate-700">
-                                      {displayName || item.nameEn || item.nameTh}
-                                    </span>
-                                    {item.postalCodes.length > 0 && (
-                                      <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-slate-100 text-slate-600">
-                                        {item.postalCodes.length} {t.postalCode}
-                                      </span>
-                                    )}
-                                  </div>
-                                  {item.postalCodes.length > 0 && (
-                                    <div className="mt-2 flex flex-wrap gap-1">
-                                      {visibleCodes.map((code) => (
-                                        <span
-                                          key={code}
-                                          className="px-2 py-0.5 rounded-full bg-white text-slate-600 text-[10px] font-semibold border border-slate-200"
-                                        >
-                                          {code}
-                                        </span>
-                                      ))}
-                                      {remaining > 0 && (
-                                        <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-semibold">
-                                          +{remaining}
-                                        </span>
-                                      )}
-                                    </div>
-                                  )}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        ) : (
-                          <p className="text-sm text-slate-500">{t.tambonFallbackEmpty}</p>
-                        )}
-                     </div>
-                   )
-                 )}
-
-                 {viewState === 'AMPHOE' && (
-                   selectedTambon ? (
-                     <div className="bg-emerald-50 p-5 rounded-2xl border border-emerald-100 animate-slide-up">
-                        <h3 className="text-xs font-bold text-emerald-500 uppercase mb-3 tracking-wide flex items-center gap-2">
-                             <MapPin className="w-4 h-4" /> {t.selectedTambonTitle}
-                        </h3>
-                        <p className="text-2xl font-bold text-emerald-900 mb-2">{selectedTambonLabel}</p>
-                        <div className="mt-4">
-                            <p className="text-xs font-bold text-emerald-600 uppercase tracking-wide">
-                              {t.allPostcodes}
-                            </p>
-                            {loadingPostcodes ? (
-                              <p className="text-sm text-slate-500 mt-2">{t.postcodesLoading}</p>
-                            ) : errorPostcodes ? (
-                              <p className="text-sm text-red-600 mt-2">{errorPostcodes}</p>
-                            ) : selectedTambonPostcodes.length > 0 ? (
-                              <div className="mt-2 flex flex-wrap gap-2">
-                                {selectedTambonPostcodes.map((code) => (
-                                  <span
-                                    key={code}
-                                    className="px-2.5 py-1 rounded-full bg-white text-emerald-800 text-xs font-semibold shadow-sm border border-emerald-100"
-                                  >
-                                    {code}
+              {viewState === 'AMPHOE' && (
+                !tambonMapAvailable && (
+                  <div className="bg-white/90 p-5 rounded-2xl border border-slate-100 shadow-sm">
+                    <div className="flex items-center justify-between gap-2 mb-3">
+                      <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wide">
+                        {t.tambonFallbackListTitle}
+                      </h3>
+                    </div>
+                    <p className="text-xs text-slate-400 mb-3">{t.tambonFallbackListHint}</p>
+                    {loadingPostcodes ? (
+                      <p className="text-sm text-slate-500">{t.postcodesLoading}</p>
+                    ) : errorPostcodes ? (
+                      <p className="text-sm text-red-600">{errorPostcodes}</p>
+                    ) : tambonFallbackList.length > 0 ? (
+                      <div className="space-y-2 max-h-64 overflow-auto pr-1">
+                        {tambonFallbackList.map((item) => {
+                          const displayName = language === 'TH' ? item.nameTh : item.nameEn;
+                          const itemKey = normalizeAdminKey(item.nameEn || item.nameTh);
+                          const isSelected = Boolean(selectedTambonKey && itemKey === selectedTambonKey);
+                          const visibleCodes = item.postalCodes.slice(0, 5);
+                          const remaining = item.postalCodes.length - visibleCodes.length;
+                          return (
+                            <button
+                              key={`${itemKey}-${item.nameEn}`}
+                              onClick={() => handleTambonListSelect(item)}
+                              className={`w-full text-left px-3 py-2 rounded-xl border transition ${isSelected
+                                  ? "border-emerald-400 bg-emerald-50"
+                                  : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+                                }`}
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-sm font-semibold text-slate-700">
+                                  {displayName || item.nameEn || item.nameTh}
+                                </span>
+                                {item.postalCodes.length > 0 && (
+                                  <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-slate-100 text-slate-600">
+                                    {item.postalCodes.length} {t.postalCode}
                                   </span>
-                                ))}
+                                )}
                               </div>
-                            ) : (
-                              <p className="text-sm text-slate-500 mt-2">{t.postcodesNotFound}</p>
-                            )}
-                        </div>
-                     </div>
-                   ) : (
-                     <div className="bg-slate-50 p-5 rounded-2xl border border-dashed border-slate-300 text-center py-8">
-                         <p className="text-slate-400 mb-2">{t.noTambonTitle}</p>
-                         <p className="text-sm text-slate-500">
-                           {tambonMapAvailable ? t.noTambonHint : t.noTambonHintList}
-                         </p>
-                     </div>
-                   )
-                 )}
+                              {item.postalCodes.length > 0 && (
+                                <div className="mt-2 flex flex-wrap gap-1">
+                                  {visibleCodes.map((code) => (
+                                    <span
+                                      key={code}
+                                      className="px-2 py-0.5 rounded-full bg-white text-slate-600 text-[10px] font-semibold border border-slate-200"
+                                    >
+                                      {code}
+                                    </span>
+                                  ))}
+                                  {remaining > 0 && (
+                                    <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-semibold">
+                                      +{remaining}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-slate-500">{t.tambonFallbackEmpty}</p>
+                    )}
+                  </div>
+                )
+              )}
 
-                 <button 
-                    onClick={viewState === 'AMPHOE' ? handleBackToProvince : handleBackToCountry}
-                    className="w-full py-3 px-4 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl transition-colors flex items-center justify-center gap-2 font-medium mt-auto"
-                 >
-                    <ChevronLeft className="w-5 h-5" /> {viewState === 'AMPHOE' ? t.backToAmphoe : t.backToOtherProvinces}
-                 </button>
+              {viewState === 'AMPHOE' && (
+                selectedTambon ? (
+                  <div className="bg-emerald-50 p-5 rounded-2xl border border-emerald-100 animate-slide-up">
+                    <h3 className="text-xs font-bold text-emerald-500 uppercase mb-3 tracking-wide flex items-center gap-2">
+                      <MapPin className="w-4 h-4" /> {t.selectedTambonTitle}
+                    </h3>
+                    <p className="text-2xl font-bold text-emerald-900 mb-2">{selectedTambonLabel}</p>
+                    <div className="mt-4">
+                      <p className="text-xs font-bold text-emerald-600 uppercase tracking-wide">
+                        {t.allPostcodes}
+                      </p>
+                      {loadingPostcodes ? (
+                        <p className="text-sm text-slate-500 mt-2">{t.postcodesLoading}</p>
+                      ) : errorPostcodes ? (
+                        <p className="text-sm text-red-600 mt-2">{errorPostcodes}</p>
+                      ) : selectedTambonPostcodes.length > 0 ? (
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {selectedTambonPostcodes.map((code) => (
+                            <span
+                              key={code}
+                              className="px-2.5 py-1 rounded-full bg-white text-emerald-800 text-xs font-semibold shadow-sm border border-emerald-100"
+                            >
+                              {code}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-slate-500 mt-2">{t.postcodesNotFound}</p>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-slate-50 p-5 rounded-2xl border border-dashed border-slate-300 text-center py-8">
+                    <p className="text-slate-400 mb-2">{t.noTambonTitle}</p>
+                    <p className="text-sm text-slate-500">
+                      {tambonMapAvailable ? t.noTambonHint : t.noTambonHintList}
+                    </p>
+                  </div>
+                )
+              )}
+
+              <button
+                onClick={viewState === 'AMPHOE' ? handleBackToProvince : handleBackToCountry}
+                className="w-full py-3 px-4 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl transition-colors flex items-center justify-center gap-2 font-medium mt-auto"
+              >
+                <ChevronLeft className="w-5 h-5" /> {viewState === 'AMPHOE' ? t.backToAmphoe : t.backToOtherProvinces}
+              </button>
             </div>
           ) : (
-             <div>{t.loadingFallback}</div>
+            <div>{t.loadingFallback}</div>
           )}
 
         </div>
