@@ -1,6 +1,6 @@
 "use client";
-import React, { useState, useEffect, useRef } from 'react';
-import { MapPin, Info, Compass, X, Type, ChevronLeft, AlertCircle, Plus, Minus } from 'lucide-react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { MapPin, Info, Compass, X, Type, ChevronLeft, AlertCircle, Plus, Minus, Search, Sparkles, Play, Pause, Share2, Layers } from 'lucide-react';
 
 // --- TYPE DEFINITIONS ---
 declare global {
@@ -94,6 +94,20 @@ interface PostcodeData {
   subdistricts: SubdistrictEntry[];
 }
 
+interface SearchResult {
+  id: string;
+  type: 'province' | 'amphoe' | 'tambon';
+  label: string;
+  sublabel?: string;
+  provinceName: string;
+  amphoeName?: string;
+  tambonName?: string;
+}
+
+interface SearchIndexItem extends SearchResult {
+  searchKey: string;
+}
+
 // --- CONFIGURATION ---
 const REGION_CONFIG: RegionConfig = {
   "North": { name: "ภาคเหนือ", color: "#16A34A", textColor: "#FFFFFF", description: "ดินแดนแห่งขุนเขา ทะเลหมอก และวัฒนธรรมล้านนา", provinces: ["เชียงราย", "เชียงใหม่", "น่าน", "พะเยา", "แพร่", "แม่ฮ่องสอน", "ลำปาง", "ลำพูน", "อุตรดิตถ์"] },
@@ -137,7 +151,7 @@ const normalizeAdminName = (name: string): string => {
       break;
     }
   }
-  cleaned = cleaned.replace(/^k\\s+/, "");
+  cleaned = cleaned.replace(/^k\s+/, "");
   cleaned = cleaned.replace(/mueang/g, "muang");
   return cleaned
     .replace(/[().,ฯ'’\\-]/g, "")
@@ -150,6 +164,12 @@ const normalizeAdminKey = (name: string): string =>
 
 const isValidName = (value?: string): value is string =>
   Boolean(value && value !== "NA");
+
+const normalizeSearchText = (value: string): string =>
+  value
+    .toLowerCase()
+    .replace(/[().,ฯ'’\\-]/g, "")
+    .replace(/\s+/g, "");
 
 const matchNormalizedKey = (
   value: string | undefined,
@@ -210,6 +230,15 @@ export default function App() {
   const [selectedTambon, setSelectedTambon] = useState<SelectedTambon | null>(null);
   const [selectedTambonPostcodes, setSelectedTambonPostcodes] = useState<string[]>([]);
   const [hoveredFeature, setHoveredFeature] = useState<string | null>(null);
+  const [hoveredPosition, setHoveredPosition] = useState<{ x: number; y: number } | null>(null);
+  const [focusMode, setFocusMode] = useState<boolean>(true);
+  const [mapLayer, setMapLayer] = useState<'REGION' | 'AREA'>('REGION');
+  const [tourActive, setTourActive] = useState<boolean>(false);
+  const [tourRegionKey, setTourRegionKey] = useState<string | null>(null);
+  const [tourIndex, setTourIndex] = useState<number>(0);
+  const [searchTerm, setSearchTerm] = useState<string>("");
+  const [copiedLink, setCopiedLink] = useState<boolean>(false);
+  const [deepLinkApplied, setDeepLinkApplied] = useState<boolean>(false);
   
   const [loading, setLoading] = useState<boolean>(true);
   const [loadingAmphoe, setLoadingAmphoe] = useState<boolean>(false);
@@ -361,6 +390,142 @@ export default function App() {
       return "";
   };
 
+  const stopTour = () => {
+    setTourActive(false);
+    setTourRegionKey(null);
+  };
+
+  const findProvinceFeature = (provinceName: string): GeoJSONFeature | null => {
+    if (!provinceData) return null;
+    const targetKey = normalizeProvinceKey(provinceName);
+    return (
+      provinceData.features.find((feature) =>
+        matchNormalizedKey(getThaiName(feature.properties), targetKey, normalizeProvinceKey)
+      ) || null
+    );
+  };
+
+  const findAmphoeFeature = (
+    provinceName: string,
+    amphoeName: string,
+    data: GeoJSONData
+  ): GeoJSONFeature | null => {
+    const provinceKey = normalizeProvinceKey(provinceName);
+    const amphoeKey = normalizeAdminKey(amphoeName);
+    return (
+      data.features.find(
+        (feature) =>
+          matchNormalizedKey(getProvinceNameFromFeature(feature.properties), provinceKey, normalizeProvinceKey) &&
+          (
+            matchNormalizedKey(feature.properties.NAME_2, amphoeKey, normalizeAdminKey) ||
+            matchNormalizedKey(feature.properties.NL_NAME_2, amphoeKey, normalizeAdminKey) ||
+            matchNormalizedKey(getThaiName(feature.properties), amphoeKey, normalizeAdminKey)
+          )
+      ) || null
+    );
+  };
+
+  const findTambonFeature = (
+    provinceName: string,
+    amphoeName: string,
+    tambonName: string,
+    data: GeoJSONData
+  ): GeoJSONFeature | null => {
+    const provinceKey = normalizeProvinceKey(provinceName);
+    const amphoeKey = normalizeAdminKey(amphoeName);
+    const tambonKey = normalizeAdminKey(tambonName);
+    return (
+      data.features.find(
+        (feature) =>
+          matchNormalizedKey(getProvinceNameFromFeature(feature.properties), provinceKey, normalizeProvinceKey) &&
+          (
+            matchNormalizedKey(feature.properties.NAME_2, amphoeKey, normalizeAdminKey) ||
+            matchNormalizedKey(feature.properties.NL_NAME_2, amphoeKey, normalizeAdminKey) ||
+            matchNormalizedKey(getAmphoeNameFromTambon(feature.properties), amphoeKey, normalizeAdminKey)
+          ) &&
+          (
+            matchNormalizedKey(feature.properties.NAME_3, tambonKey, normalizeAdminKey) ||
+            matchNormalizedKey(feature.properties.NL_NAME_3, tambonKey, normalizeAdminKey) ||
+            matchNormalizedKey(getThaiName(feature.properties), tambonKey, normalizeAdminKey)
+          )
+      ) || null
+    );
+  };
+
+  const selectProvinceByName = async (provinceName: string) => {
+    stopTour();
+    const provinceFeature = findProvinceFeature(provinceName);
+    if (!provinceFeature) return;
+    const name = getThaiName(provinceFeature.properties);
+    const region = getRegionByProvince(name);
+
+    setSelectedProvince({ name, region, properties: provinceFeature.properties });
+    setSelectedAmphoe(null);
+    setSelectedTambon(null);
+    setSelectedTambonPostcodes([]);
+    setViewState('PROVINCE');
+    await loadAmphoeData();
+  };
+
+  const selectAmphoeByName = async (provinceName: string, amphoeName: string) => {
+    stopTour();
+    const provinceFeature = findProvinceFeature(provinceName);
+    if (!provinceFeature) return;
+    const provinceDisplayName = getThaiName(provinceFeature.properties);
+    const region = getRegionByProvince(provinceDisplayName);
+
+    setSelectedProvince({ name: provinceDisplayName, region, properties: provinceFeature.properties });
+    setSelectedTambon(null);
+    setSelectedTambonPostcodes([]);
+
+    const amphoes = await loadAmphoeData();
+    if (!amphoes) return;
+
+    const amphoeFeature = findAmphoeFeature(provinceDisplayName, amphoeName, amphoes);
+    if (!amphoeFeature) {
+      setSelectedAmphoe(null);
+      setViewState('PROVINCE');
+      return;
+    }
+
+    setSelectedAmphoe({ name: getThaiName(amphoeFeature.properties), properties: amphoeFeature.properties });
+    setViewState('AMPHOE');
+    await loadTambonData();
+    void loadPostcodeData();
+  };
+
+  const selectTambonByName = async (provinceName: string, amphoeName: string, tambonName: string) => {
+    stopTour();
+    const provinceFeature = findProvinceFeature(provinceName);
+    if (!provinceFeature) return;
+    const provinceDisplayName = getThaiName(provinceFeature.properties);
+    const region = getRegionByProvince(provinceDisplayName);
+
+    setSelectedProvince({ name: provinceDisplayName, region, properties: provinceFeature.properties });
+    setSelectedTambonPostcodes([]);
+
+    const amphoes = await loadAmphoeData();
+    if (!amphoes) return;
+
+    const amphoeFeature = findAmphoeFeature(provinceDisplayName, amphoeName, amphoes);
+    if (!amphoeFeature) {
+      setSelectedAmphoe(null);
+      setSelectedTambon(null);
+      setViewState('PROVINCE');
+      return;
+    }
+
+    setSelectedAmphoe({ name: getThaiName(amphoeFeature.properties), properties: amphoeFeature.properties });
+    setViewState('AMPHOE');
+
+    const tambons = await loadTambonData();
+    if (!tambons) return;
+
+    const tambonFeature = findTambonFeature(provinceDisplayName, amphoeName, tambonName, tambons);
+    setSelectedTambon(tambonFeature ? { name: getThaiName(tambonFeature.properties), properties: tambonFeature.properties } : null);
+    void loadPostcodeData();
+  };
+
   useEffect(() => {
     if (!selectedTambon || !selectedAmphoe || !selectedProvince) {
       setSelectedTambonPostcodes([]);
@@ -419,6 +584,209 @@ export default function App() {
 
     setSelectedTambonPostcodes(codes);
   }, [selectedTambon, selectedAmphoe, selectedProvince, postcodeData]);
+
+  useEffect(() => {
+    if (!searchTerm.trim()) return;
+    if (!postcodeData && !loadingPostcodes) {
+      void loadPostcodeData();
+    }
+  }, [searchTerm, postcodeData, loadingPostcodes]);
+
+  const searchIndex = useMemo(() => {
+    const items: SearchIndexItem[] = [];
+
+    if (postcodeData) {
+      const provinceByCode = new Map<number, ProvinceEntry>();
+      const districtByCode = new Map<number, DistrictEntry>();
+
+      postcodeData.provinces.forEach((province) => {
+        provinceByCode.set(province.provinceCode, province);
+        const label = province.provinceNameTh || province.provinceNameEn;
+        const sublabel = province.provinceNameTh ? province.provinceNameEn : undefined;
+        const searchKey = normalizeSearchText(`${province.provinceNameTh} ${province.provinceNameEn}`);
+        if (!searchKey) return;
+        items.push({
+          id: `province-${province.provinceCode}`,
+          type: 'province',
+          label,
+          sublabel,
+          provinceName: province.provinceNameEn,
+          searchKey
+        });
+      });
+
+      postcodeData.districts.forEach((district) => {
+        districtByCode.set(district.districtCode, district);
+        const province = provinceByCode.get(district.provinceCode);
+        if (!province) return;
+        const label = district.districtNameTh || district.districtNameEn;
+        const sublabel = province.provinceNameTh || province.provinceNameEn;
+        const searchKey = normalizeSearchText(
+          `${district.districtNameTh} ${district.districtNameEn} ${province.provinceNameTh} ${province.provinceNameEn}`
+        );
+        if (!searchKey) return;
+        items.push({
+          id: `amphoe-${district.districtCode}`,
+          type: 'amphoe',
+          label,
+          sublabel,
+          provinceName: province.provinceNameEn,
+          amphoeName: district.districtNameEn,
+          searchKey
+        });
+      });
+
+      postcodeData.subdistricts.forEach((subdistrict) => {
+        const province = provinceByCode.get(subdistrict.provinceCode);
+        const district = districtByCode.get(subdistrict.districtCode);
+        if (!province || !district) return;
+        const label = subdistrict.subdistrictNameTh || subdistrict.subdistrictNameEn;
+        const sublabel = `${district.districtNameTh || district.districtNameEn} • ${province.provinceNameTh || province.provinceNameEn}`;
+        const searchKey = normalizeSearchText(
+          `${subdistrict.subdistrictNameTh} ${subdistrict.subdistrictNameEn} ${district.districtNameTh} ${district.districtNameEn} ${province.provinceNameTh} ${province.provinceNameEn}`
+        );
+        if (!searchKey) return;
+        items.push({
+          id: `tambon-${subdistrict.subdistrictCode}`,
+          type: 'tambon',
+          label,
+          sublabel,
+          provinceName: province.provinceNameEn,
+          amphoeName: district.districtNameEn,
+          tambonName: subdistrict.subdistrictNameEn,
+          searchKey
+        });
+      });
+    } else if (provinceData) {
+      provinceData.features.forEach((feature, index) => {
+        const label = getThaiName(feature.properties);
+        const searchKey = normalizeSearchText(label);
+        if (!searchKey) return;
+        items.push({
+          id: `province-geo-${index}`,
+          type: 'province',
+          label,
+          provinceName: label,
+          searchKey
+        });
+      });
+    }
+
+    return items;
+  }, [postcodeData, provinceData]);
+
+  const searchResults = useMemo(() => {
+    const query = normalizeSearchText(searchTerm.trim());
+    if (!query) return [];
+    const scored = searchIndex
+      .map((item) => {
+        const matchIndex = item.searchKey.indexOf(query);
+        if (matchIndex === -1) return null;
+        const typeBoost = item.type === 'province' ? 0 : item.type === 'amphoe' ? 10 : 20;
+        return { item, score: matchIndex + typeBoost };
+      })
+      .filter((entry): entry is { item: SearchResult; score: number } => Boolean(entry))
+      .sort((a, b) => a.score - b.score || a.item.label.length - b.item.label.length)
+      .slice(0, 12)
+      .map((entry) => entry.item);
+
+    return scored;
+  }, [searchIndex, searchTerm]);
+
+  useEffect(() => {
+    if (deepLinkApplied || !provinceData) return;
+
+    const params = new URLSearchParams(window.location.search);
+    if (params.toString().length === 0) {
+      setDeepLinkApplied(true);
+      return;
+    }
+
+    const layerParam = params.get("layer");
+    if (layerParam === "area") setMapLayer("AREA");
+    if (layerParam === "region") setMapLayer("REGION");
+    const focusParam = params.get("focus");
+    if (focusParam === "0") setFocusMode(false);
+    if (focusParam === "1") setFocusMode(true);
+    const labelsParam = params.get("labels");
+    if (labelsParam === "0") setShowLabels(false);
+    if (labelsParam === "1") setShowLabels(true);
+
+    const provinceParam = params.get("p");
+    if (!provinceParam) {
+      setDeepLinkApplied(true);
+      return;
+    }
+
+    const provinceFeature = findProvinceFeature(provinceParam);
+    if (!provinceFeature) {
+      setDeepLinkApplied(true);
+      return;
+    }
+
+    const provinceName = getThaiName(provinceFeature.properties);
+    const region = getRegionByProvince(provinceName);
+    setSelectedProvince({ name: provinceName, region, properties: provinceFeature.properties });
+    setSelectedTambon(null);
+    setSelectedTambonPostcodes([]);
+
+    const amphoeParam = params.get("a");
+    if (!amphoeParam) {
+      setSelectedAmphoe(null);
+      setViewState('PROVINCE');
+      void loadAmphoeData();
+      setDeepLinkApplied(true);
+      return;
+    }
+
+    if (!amphoeData) {
+      void loadAmphoeData();
+      return;
+    }
+
+    const amphoeFeature = findAmphoeFeature(provinceName, amphoeParam, amphoeData);
+    if (!amphoeFeature) {
+      setSelectedAmphoe(null);
+      setViewState('PROVINCE');
+      setDeepLinkApplied(true);
+      return;
+    }
+
+    setSelectedAmphoe({ name: getThaiName(amphoeFeature.properties), properties: amphoeFeature.properties });
+    setViewState('AMPHOE');
+    void loadTambonData();
+
+    const tambonParam = params.get("t");
+    if (!tambonParam) {
+      setSelectedTambon(null);
+      setDeepLinkApplied(true);
+      return;
+    }
+
+    if (!tambonData) {
+      return;
+    }
+
+    const tambonFeature = findTambonFeature(provinceName, amphoeParam, tambonParam, tambonData);
+    setSelectedTambon(tambonFeature ? { name: getThaiName(tambonFeature.properties), properties: tambonFeature.properties } : null);
+    void loadPostcodeData();
+    setDeepLinkApplied(true);
+  }, [deepLinkApplied, provinceData, amphoeData, tambonData]);
+
+  useEffect(() => {
+    if (!deepLinkApplied) return;
+    const params = new URLSearchParams();
+    if (selectedProvince) params.set("p", selectedProvince.name);
+    if (viewState === 'AMPHOE' && selectedAmphoe) params.set("a", selectedAmphoe.name);
+    if (viewState === 'AMPHOE' && selectedTambon) params.set("t", selectedTambon.name);
+    params.set("layer", mapLayer === 'AREA' ? "area" : "region");
+    params.set("labels", showLabels ? "1" : "0");
+    params.set("focus", focusMode ? "1" : "0");
+
+    const query = params.toString();
+    const nextUrl = query ? `${window.location.pathname}?${query}` : window.location.pathname;
+    window.history.replaceState(null, "", nextUrl);
+  }, [deepLinkApplied, selectedProvince, selectedAmphoe, selectedTambon, viewState, mapLayer, showLabels, focusMode]);
 
   // 3. Main D3 Render Logic
   useEffect(() => {
@@ -532,6 +900,15 @@ export default function App() {
     }
 
     const pathGenerator = d3.geoPath().projection(projection);
+    if (mapLayer === 'AREA' && featuresToRender.length > 0) {
+      const areas = featuresToRender.map((feature) => pathGenerator.area(feature));
+      const [minArea, maxArea] = d3.extent(areas);
+      if (minArea !== undefined && maxArea !== undefined) {
+        const safeMax = minArea === maxArea ? minArea + 1 : maxArea;
+        const areaScale = d3.scaleSequential(d3.interpolateYlGnBu).domain([minArea, safeMax]);
+        getFillColor = (d: GeoJSONFeature) => areaScale(pathGenerator.area(d));
+      }
+    }
     const g = svg.append("g");
     const gPaths = g.append("g").attr("class", "map-paths");
     const gLabels = g.append("g").attr("class", "map-labels");
@@ -539,6 +916,16 @@ export default function App() {
       const color = getFillColor(d, i);
       baseFillMap.set(d, color);
       return color;
+    };
+    const applyBaseOpacity = () => {
+      if (viewState === 'COUNTRY' && tourActive && tourRegionKey) {
+        gPaths.selectAll("path").attr("opacity", (d: GeoJSONFeature) => {
+          const regionKey = getRegionByProvince(getThaiName(d.properties));
+          return regionKey === tourRegionKey ? 1 : 0.15;
+        });
+        return;
+      }
+      gPaths.selectAll("path").attr("opacity", 1);
     };
 
     // Setup Zoom Behavior
@@ -565,13 +952,22 @@ export default function App() {
         .on("mouseover", function(this: any, event: any, d: GeoJSONFeature) {
             const name = getFeatureName(d);
             setHoveredFeature(name);
+            setHoveredPosition({ x: event.clientX, y: event.clientY });
             d3.select(this)
             .attr("fill", "#FACC15")
             .attr("stroke-width", 2)
             .raise();
+            if (focusMode && !tourActive) {
+                gPaths.selectAll("path").attr("opacity", 0.3);
+                d3.select(this).attr("opacity", 1);
+            }
+        })
+        .on("mousemove", function(this: any, event: any) {
+            setHoveredPosition({ x: event.clientX, y: event.clientY });
         })
         .on("mouseout", function(this: any, event: any, d: GeoJSONFeature, i: number) {
             setHoveredFeature(null);
+            setHoveredPosition(null);
             const baseFill =
               baseFillMap.get(d) ?? getFillColor(d, featuresToRender.indexOf(d));
             if (viewState === 'AMPHOE') {
@@ -580,9 +976,13 @@ export default function App() {
             } else {
                 d3.select(this).attr("fill", baseFill);
             }
+            if (focusMode && !tourActive) {
+                applyBaseOpacity();
+            }
         })
         .on("click", async function(this: any, event: any, d: GeoJSONFeature) {
             const name = getFeatureName(d);
+            stopTour();
             
             if (viewState === 'COUNTRY') {
                 const region = getRegionByProvince(name);
@@ -642,11 +1042,32 @@ export default function App() {
             .style("text-shadow", "2px 0 #fff, -2px 0 #fff, 0 2px #fff, 0 -2px #fff")
             .style("opacity", 0.9);
         }
+
+        if (viewState === 'AMPHOE' && selectedTambon) {
+            const targetKey = normalizeAdminKey(selectedTambon.name);
+            gPaths.selectAll("path")
+              .classed("is-selected", (feature: GeoJSONFeature) =>
+                matchNormalizedKey(getThaiName(feature.properties), targetKey, normalizeAdminKey)
+              )
+              .attr("fill", (feature: GeoJSONFeature, index: number) => {
+                const isSelected = matchNormalizedKey(getThaiName(feature.properties), targetKey, normalizeAdminKey);
+                if (isSelected) return "#DC2626";
+                return baseFillMap.get(feature) ?? getFillColor(feature, index);
+              });
+            gPaths.selectAll("path")
+              .filter((feature: GeoJSONFeature) =>
+                matchNormalizedKey(getThaiName(feature.properties), targetKey, normalizeAdminKey)
+              )
+              .raise();
+        }
+
+        applyBaseOpacity();
     }
 
-  }, [d3Loaded, provinceData, amphoeData, tambonData, viewState, selectedProvince, selectedAmphoe, showLabels]);
+  }, [d3Loaded, provinceData, amphoeData, tambonData, viewState, selectedProvince, selectedAmphoe, selectedTambon, showLabels, mapLayer, focusMode, tourActive, tourRegionKey]);
 
   const handleBackToCountry = () => {
+      stopTour();
       setViewState('COUNTRY');
       setSelectedAmphoe(null);
       setSelectedTambon(null);
@@ -658,6 +1079,7 @@ export default function App() {
   };
 
   const handleBackToProvince = () => {
+      stopTour();
       setViewState('PROVINCE');
       setSelectedTambon(null);
       setSelectedTambonPostcodes([]);
@@ -667,6 +1089,7 @@ export default function App() {
 
   const handleZoom = (factor: number) => {
     if (!svgRef.current || !zoomRef.current || !window.d3) return;
+    stopTour();
     const d3 = window.d3;
     d3.select(svgRef.current)
       .transition()
@@ -674,11 +1097,59 @@ export default function App() {
       .call(zoomRef.current.scaleBy, factor);
   };
 
-  const handleRegionClick = (regionKey: string) => {
+  const handleCopyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 1500);
+    } catch {
+      const textarea = document.createElement("textarea");
+      textarea.value = window.location.href;
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textarea);
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 1500);
+    }
+  };
+
+  const handleSearchSelect = async (result: SearchResult) => {
+    setSearchTerm("");
+    if (result.type === 'province') {
+      await selectProvinceByName(result.provinceName);
+      return;
+    }
+    if (result.type === 'amphoe' && result.amphoeName) {
+      await selectAmphoeByName(result.provinceName, result.amphoeName);
+      return;
+    }
+    if (result.type === 'tambon' && result.amphoeName && result.tambonName) {
+      await selectTambonByName(result.provinceName, result.amphoeName, result.tambonName);
+    }
+  };
+
+  const handleToggleTour = () => {
+    if (tourActive) {
+      setTourActive(false);
+      setTourRegionKey(null);
+      return;
+    }
+    handleBackToCountry();
+    setTourIndex(0);
+    setTourActive(true);
+  };
+
+  const handleRegionClick = useCallback((regionKey: string, options?: { fromTour?: boolean }) => {
     if (!provinceData || !svgRef.current || !zoomRef.current || !window.d3) return;
     const d3 = window.d3;
     const width = 800;
     const height = 1200;
+
+    if (!options?.fromTour) {
+      setTourActive(false);
+      setTourRegionKey(null);
+    }
 
     // 1. Filter features for this region
     const regionFeatures = provinceData.features.filter(f => {
@@ -712,7 +1183,23 @@ export default function App() {
       .transition()
       .duration(750)
       .call(zoomRef.current.transform, d3.zoomIdentity.translate(translate[0], translate[1]).scale(scale));
-  };
+  }, [provinceData]);
+
+  useEffect(() => {
+    if (!tourActive || viewState !== 'COUNTRY' || !provinceData) return;
+    const regionKeys = Object.keys(REGION_CONFIG);
+    if (regionKeys.length === 0) return;
+    const currentKey = regionKeys[tourIndex % regionKeys.length];
+    setTourRegionKey(currentKey);
+    handleRegionClick(currentKey, { fromTour: true });
+    const timer = setTimeout(() => {
+      setTourIndex((prev) => (prev + 1) % regionKeys.length);
+    }, 4500);
+    return () => clearTimeout(timer);
+  }, [tourActive, tourIndex, viewState, provinceData, handleRegionClick]);
+
+  const hoverTypeLabel =
+    viewState === 'COUNTRY' ? 'จังหวัด' : viewState === 'PROVINCE' ? 'อำเภอ' : 'ตำบล';
 
   return (
     <div className="min-h-screen bg-stone-50 font-sans text-stone-800 relative overflow-hidden">
@@ -755,7 +1242,7 @@ export default function App() {
         <div className="z-10 relative w-full h-full flex flex-col items-center justify-center">
             
             {/* Header / Back Button */}
-            <div className="absolute top-4 left-4 z-20 flex flex-col gap-3">
+            <div className="absolute top-4 left-4 z-20 flex flex-col gap-3 w-72 max-w-[calc(100vw-2rem)]">
                 {viewState === 'AMPHOE' ? (
                     <button 
                         onClick={handleBackToProvince}
@@ -778,14 +1265,113 @@ export default function App() {
                         <p className="text-xs text-slate-500 mt-1">คลิกที่จังหวัดเพื่อดูรายอำเภอ</p>
                     </div>
                 )}
-                
-                <button 
-                  onClick={() => setShowLabels(!showLabels)}
-                  className="flex items-center gap-2 px-3 py-2 bg-white hover:bg-slate-50 rounded-lg text-sm font-semibold shadow-md transition-all border border-slate-200 text-slate-700 w-fit"
-                >
-                  <Type className="w-4 h-4" /> 
-                  {showLabels ? "ซ่อนชื่อ" : "แสดงชื่อ"}
-                </button>
+
+                <div className="bg-white/90 backdrop-blur-md px-3 py-3 rounded-xl shadow-lg border border-white/50 space-y-2">
+                  <div className="flex flex-wrap gap-2">
+                    <button 
+                      onClick={() => setShowLabels(!showLabels)}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold shadow-sm transition-all border ${
+                        showLabels ? "bg-slate-900 text-white border-slate-900" : "bg-white hover:bg-slate-50 text-slate-700 border-slate-200"
+                      }`}
+                    >
+                      <Type className="w-4 h-4" /> 
+                      {showLabels ? "ซ่อนชื่อ" : "แสดงชื่อ"}
+                    </button>
+                    <button 
+                      onClick={() => setFocusMode(!focusMode)}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold shadow-sm transition-all border ${
+                        focusMode ? "bg-emerald-600 text-white border-emerald-600" : "bg-white hover:bg-slate-50 text-slate-700 border-slate-200"
+                      }`}
+                    >
+                      <Sparkles className="w-4 h-4" /> โหมดโฟกัส
+                    </button>
+                    <button 
+                      onClick={handleCopyLink}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold shadow-sm transition-all border ${
+                        copiedLink ? "bg-blue-600 text-white border-blue-600" : "bg-white hover:bg-slate-50 text-slate-700 border-slate-200"
+                      }`}
+                    >
+                      <Share2 className="w-4 h-4" /> {copiedLink ? "คัดลอกแล้ว" : "แชร์ลิงก์"}
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Layers className="w-4 h-4 text-slate-400" />
+                    <div className="flex items-center gap-1 bg-slate-100 rounded-full p-1">
+                      <button
+                        onClick={() => setMapLayer('REGION')}
+                        className={`px-3 py-1 rounded-full text-[11px] font-semibold transition ${
+                          mapLayer === 'REGION' ? "bg-white text-slate-800 shadow" : "text-slate-500 hover:text-slate-700"
+                        }`}
+                      >
+                        ภูมิภาค
+                      </button>
+                      <button
+                        onClick={() => setMapLayer('AREA')}
+                        className={`px-3 py-1 rounded-full text-[11px] font-semibold transition ${
+                          mapLayer === 'AREA' ? "bg-white text-slate-800 shadow" : "text-slate-500 hover:text-slate-700"
+                        }`}
+                      >
+                        ขนาดพื้นที่
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white/90 backdrop-blur-md px-3 py-3 rounded-xl shadow-lg border border-white/50">
+                  <div className="flex items-center gap-2">
+                    <Search className="w-4 h-4 text-slate-500" />
+                    <input
+                      value={searchTerm}
+                      onChange={(event) => setSearchTerm(event.target.value)}
+                      placeholder="ค้นหาจังหวัด/อำเภอ/ตำบล"
+                      className="flex-1 bg-transparent text-sm text-slate-700 placeholder:text-slate-400 outline-none"
+                    />
+                    {searchTerm && (
+                      <button
+                        onClick={() => setSearchTerm("")}
+                        className="p-1 rounded-full hover:bg-slate-100 text-slate-500"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+                  {searchTerm && (
+                    <div className="mt-2 max-h-64 overflow-auto space-y-1">
+                      {loadingPostcodes && !postcodeData && (
+                        <p className="text-xs text-slate-500 px-2 py-1.5">กำลังโหลดฐานข้อมูลค้นหา...</p>
+                      )}
+                      {searchResults.length === 0 && !loadingPostcodes && (
+                        <p className="text-xs text-slate-500 px-2 py-1.5">ไม่พบผลลัพธ์</p>
+                      )}
+                      {searchResults.map((result) => (
+                        <button
+                          key={result.id}
+                          onMouseDown={(event) => event.preventDefault()}
+                          onClick={() => handleSearchSelect(result)}
+                          className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-slate-50 transition"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-sm font-semibold text-slate-700">{result.label}</span>
+                            <span
+                              className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
+                                result.type === 'province'
+                                  ? "bg-emerald-100 text-emerald-700"
+                                  : result.type === 'amphoe'
+                                    ? "bg-blue-100 text-blue-700"
+                                    : "bg-amber-100 text-amber-700"
+                              }`}
+                            >
+                              {result.type === 'province' ? "จังหวัด" : result.type === 'amphoe' ? "อำเภอ" : "ตำบล"}
+                            </span>
+                          </div>
+                          {result.sublabel && (
+                            <p className="text-[11px] text-slate-500 mt-0.5">{result.sublabel}</p>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
             </div>
 
             {/* Zoom Controls */}
@@ -820,13 +1406,48 @@ export default function App() {
                             </div>
                         ))}
                     </div>
+                    {mapLayer === 'AREA' && (
+                      <div className="mt-4">
+                        <div className="flex items-center justify-between text-[10px] text-slate-500 mb-1">
+                          <span>เล็ก</span>
+                          <span>ใหญ่</span>
+                        </div>
+                        <div className="h-2 rounded-full bg-gradient-to-r from-emerald-100 via-cyan-400 to-blue-700"></div>
+                      </div>
+                    )}
+                    <div className="mt-4 pt-4 border-t border-slate-200">
+                      <button
+                        onClick={handleToggleTour}
+                        className={`w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold transition ${
+                          tourActive ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                        }`}
+                      >
+                        {tourActive ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                        {tourActive ? "หยุดทัวร์ภาค" : "เริ่มทัวร์ภาค"}
+                      </button>
+                      {tourActive && tourRegionKey && (
+                        <div className="mt-2 flex items-center gap-2 text-[11px] text-slate-500">
+                          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                          กำลังพาเที่ยว {REGION_CONFIG[tourRegionKey].name}
+                        </div>
+                      )}
+                    </div>
                 </div>
             )}
             
             {/* Hover Tooltip */}
-            {hoveredFeature && (
-               <div className="absolute top-4 right-4 bg-slate-800 text-white px-4 py-2 rounded-lg shadow-xl text-lg font-bold z-50 animate-fade-in pointer-events-none transform translate-y-2 border-2 border-slate-600">
-                  {hoveredFeature}
+            {hoveredFeature && hoveredPosition && (
+               <div
+                 className="fixed z-50 pointer-events-none bg-slate-900/95 text-white px-3 py-2 rounded-xl shadow-2xl border border-slate-700/60 backdrop-blur-sm"
+                 style={{ left: hoveredPosition.x + 14, top: hoveredPosition.y + 14 }}
+               >
+                  <p className="text-[10px] uppercase tracking-widest text-slate-300">{hoverTypeLabel}</p>
+                  <p className="text-sm font-bold leading-tight">{hoveredFeature}</p>
+                  {viewState === 'COUNTRY' && (
+                    <p className="text-[10px] text-slate-400 mt-0.5">
+                      {REGION_CONFIG[getRegionByProvince(hoveredFeature)].name}
+                    </p>
+                  )}
                </div>
             )}
 
