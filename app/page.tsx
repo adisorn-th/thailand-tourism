@@ -32,6 +32,7 @@ interface GeoJSONProperties {
   NL_NAME_1?: string;
   NL_NAME_2?: string;
   NL_NAME_3?: string;
+  VARNAME_3?: string;
   name?: string;
   province_th?: string;
   pro_th?: string;
@@ -211,7 +212,9 @@ const UI_TEXT = {
     tambonMapUnavailableHint: "แสดงรายชื่อแขวง/ตำบลจากฐานไปรษณีย์ทางแถบข้อมูลแทน",
     tambonFallbackListTitle: "รายชื่อแขวง/ตำบลจากฐานไปรษณีย์",
     tambonFallbackListHint: "คลิกชื่อเพื่อดูรหัสไปรษณีย์ทั้งหมด",
-    tambonFallbackEmpty: "ไม่พบรายชื่อแขวง/ตำบลในฐานไปรษณีย์"
+    tambonFallbackEmpty: "ไม่พบรายชื่อแขวง/ตำบลในฐานไปรษณีย์",
+    tambonSupplementTitle: "ตำบลที่ยังไม่มีในแผนที่",
+    tambonSupplementHint: "แสดงตำบลจากฐานไปรษณีย์ที่ขาดหาย คลิกชื่อเพื่อดูรหัสไปรษณีย์"
   },
   EN: {
     mapTitle: "Thailand Map",
@@ -270,7 +273,9 @@ const UI_TEXT = {
     tambonMapUnavailableHint: "Showing subdistrict list from the postal database in the sidebar",
     tambonFallbackListTitle: "Subdistrict list from postal database",
     tambonFallbackListHint: "Click a name to see all postal codes",
-    tambonFallbackEmpty: "No subdistricts found in the postal database"
+    tambonFallbackEmpty: "No subdistricts found in the postal database",
+    tambonSupplementTitle: "Missing subdistricts (postal database)",
+    tambonSupplementHint: "Showing subdistricts not in the map. Click a name for postal codes."
   }
 } as const;
 
@@ -735,36 +740,104 @@ export default function App() {
     return "";
   };
 
+  const buildProvinceKeySetFromFeature = (properties: GeoJSONProperties): Set<string> =>
+    buildNormalizedSet(
+      [
+        getProvinceNameFromFeature(properties),
+        getProvinceNameEn(properties),
+        getProvinceNameTh(properties)
+      ],
+      normalizeProvinceKey
+    );
+
+  const buildAmphoeKeySetFromFeature = (properties: GeoJSONProperties): Set<string> =>
+    buildNormalizedSet(
+      [
+        getAmphoeNameFromTambon(properties),
+        getAmphoeNameTh(properties),
+        getAmphoeNameEn(properties)
+      ],
+      normalizeAdminKey
+    );
+
+  const tambonMapKeys = useMemo(() => {
+    if (!tambonData || !selectedProvince || !selectedAmphoe) return new Set<string>();
+    const targetProvinceKeys = buildNormalizedSet(
+      [
+        selectedProvince.name,
+        getProvinceNameEn(selectedProvince.properties),
+        getProvinceNameTh(selectedProvince.properties)
+      ],
+      normalizeProvinceKey
+    );
+    const targetAmphoeKeys = buildNormalizedSet(
+      [
+        selectedAmphoe.name,
+        getAmphoeNameTh(selectedAmphoe.properties),
+        getAmphoeNameEn(selectedAmphoe.properties)
+      ],
+      normalizeAdminKey
+    );
+    const keys = new Set<string>();
+
+    tambonData.features.forEach((feature) => {
+      const provinceKeySet = buildProvinceKeySetFromFeature(feature.properties);
+      const amphoeKeySet = buildAmphoeKeySetFromFeature(feature.properties);
+      if (!setsOverlap(targetProvinceKeys, provinceKeySet) || !setsOverlap(targetAmphoeKeys, amphoeKeySet)) {
+        return;
+      }
+
+      const candidates = [
+        feature.properties.NAME_3,
+        feature.properties.NL_NAME_3,
+        feature.properties.name_th,
+        feature.properties.name,
+        feature.properties.VARNAME_3
+      ];
+      candidates.forEach((candidate) => {
+        if (!isValidName(candidate)) return;
+        const key = normalizeAdminKey(candidate);
+        if (key) keys.add(key);
+      });
+    });
+
+    return keys;
+  }, [tambonData, selectedProvince, selectedAmphoe]);
+
   const tambonMapAvailable = useMemo(() => {
     if (viewState !== 'AMPHOE') return true;
     if (!tambonData || !selectedProvince || !selectedAmphoe) return true;
-    const targetProvinceKey = normalizeProvinceKey(selectedProvince.name);
-    const targetAmphoeKey = normalizeAdminKey(selectedAmphoe.name);
+    const targetProvinceKeys = buildNormalizedSet(
+      [
+        selectedProvince.name,
+        getProvinceNameEn(selectedProvince.properties),
+        getProvinceNameTh(selectedProvince.properties)
+      ],
+      normalizeProvinceKey
+    );
+    const targetAmphoeKeys = buildNormalizedSet(
+      [
+        selectedAmphoe.name,
+        getAmphoeNameTh(selectedAmphoe.properties),
+        getAmphoeNameEn(selectedAmphoe.properties)
+      ],
+      normalizeAdminKey
+    );
     const matchedFeatures = tambonData.features.filter((feature) => {
-      const provinceName = getProvinceNameFromFeature(feature.properties);
-      const amphoeName = getAmphoeNameFromTambon(feature.properties);
-      const provinceKey = normalizeProvinceKey(provinceName);
-      const amphoeKey = normalizeAdminKey(amphoeName);
-      const provinceMatch =
-        provinceKey === targetProvinceKey ||
-        provinceKey.includes(targetProvinceKey) ||
-        targetProvinceKey.includes(provinceKey);
-      const amphoeMatch =
-        amphoeKey === targetAmphoeKey ||
-        amphoeKey.includes(targetAmphoeKey) ||
-        targetAmphoeKey.includes(amphoeKey);
-      return provinceMatch && amphoeMatch;
+      const provinceKeySet = buildProvinceKeySetFromFeature(feature.properties);
+      const amphoeKeySet = buildAmphoeKeySetFromFeature(feature.properties);
+      return setsOverlap(targetProvinceKeys, provinceKeySet) && setsOverlap(targetAmphoeKeys, amphoeKeySet);
     });
     if (matchedFeatures.length === 0) return false;
     return matchedFeatures.some((feature) => hasValidTambonName(feature.properties));
   }, [viewState, tambonData, selectedProvince, selectedAmphoe]);
 
   useEffect(() => {
-    if (viewState !== 'AMPHOE' || tambonMapAvailable) return;
+    if (viewState !== 'AMPHOE' || !selectedProvince || !selectedAmphoe) return;
     if (!postcodeData && !loadingPostcodes) {
       void loadPostcodeData();
     }
-  }, [viewState, tambonMapAvailable, postcodeData, loadingPostcodes]);
+  }, [viewState, selectedProvince, selectedAmphoe, postcodeData, loadingPostcodes]);
 
   const tambonFallbackList = useMemo(() => {
     if (!postcodeData || !selectedProvince || !selectedAmphoe) return [];
@@ -823,6 +896,19 @@ export default function App() {
 
     return list;
   }, [postcodeData, selectedProvince, selectedAmphoe, language]);
+
+  const tambonMissingList = useMemo(() => {
+    if (!postcodeData || !selectedProvince || !selectedAmphoe) return [];
+    if (tambonMapKeys.size === 0) return [];
+
+    return tambonFallbackList.filter((item) => {
+      const keys = [item.nameEn, item.nameTh]
+        .map((name) => normalizeAdminKey(name || ""))
+        .filter(Boolean);
+      if (keys.length === 0) return false;
+      return keys.every((key) => !tambonMapKeys.has(key));
+    });
+  }, [postcodeData, selectedProvince, selectedAmphoe, tambonFallbackList, tambonMapKeys]);
 
   const stopTour = () => {
     setTourActive(false);
@@ -2285,6 +2371,64 @@ export default function App() {
                     )}
                   </div>
                 )
+              )}
+
+              {viewState === 'AMPHOE' && tambonMapAvailable && tambonMissingList.length > 0 && (
+                <div className="bg-white/90 p-5 rounded-2xl border border-slate-100 shadow-sm">
+                  <div className="flex items-center justify-between gap-2 mb-3">
+                    <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wide">
+                      {t.tambonSupplementTitle}
+                    </h3>
+                  </div>
+                  <p className="text-xs text-slate-400 mb-3">{t.tambonSupplementHint}</p>
+                  <div className="space-y-2 max-h-64 overflow-auto pr-1">
+                    {tambonMissingList.map((item) => {
+                      const displayName = language === 'TH' ? item.nameTh : item.nameEn;
+                      const itemKey = normalizeAdminKey(item.nameEn || item.nameTh);
+                      const isSelected = Boolean(selectedTambonKey && itemKey === selectedTambonKey);
+                      const visibleCodes = item.postalCodes.slice(0, 5);
+                      const remaining = item.postalCodes.length - visibleCodes.length;
+                      return (
+                        <button
+                          key={`${itemKey}-${item.nameEn}`}
+                          onClick={() => handleTambonListSelect(item)}
+                          className={`w-full text-left px-3 py-2 rounded-xl border transition ${isSelected
+                              ? "border-emerald-400 bg-emerald-50"
+                              : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+                            }`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-sm font-semibold text-slate-700">
+                              {displayName || item.nameEn || item.nameTh}
+                            </span>
+                            {item.postalCodes.length > 0 && (
+                              <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-slate-100 text-slate-600">
+                                {item.postalCodes.length} {t.postalCode}
+                              </span>
+                            )}
+                          </div>
+                          {item.postalCodes.length > 0 && (
+                            <div className="mt-2 flex flex-wrap gap-1">
+                              {visibleCodes.map((code) => (
+                                <span
+                                  key={code}
+                                  className="px-2 py-0.5 rounded-full bg-white text-slate-600 text-[10px] font-semibold border border-slate-200"
+                                >
+                                  {code}
+                                </span>
+                              ))}
+                              {remaining > 0 && (
+                                <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-semibold">
+                                  +{remaining}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
               )}
 
               {viewState === 'AMPHOE' && (
